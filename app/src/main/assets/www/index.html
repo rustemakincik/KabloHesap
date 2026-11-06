@@ -25,7 +25,9 @@ body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-a
 h1{font-size:20px;font-weight:600;margin:4px 2px 12px;display:flex;align-items:center;gap:8px}
 h1 small{font-size:12px;font-weight:400;color:var(--muted)}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
-.inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.inputs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.inputs label{min-width:0}
+.field input{width:100%}
 label{display:block;font-size:13px;color:var(--muted)}
 .field{display:flex;align-items:center;border:1px solid var(--border);border-radius:10px;margin-top:5px;background:var(--surface)}
 .field:focus-within{border-color:var(--accent)}
@@ -64,6 +66,9 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
 .btn.pri{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .row{display:flex;gap:10px}
 .row .btn{flex:1}
+.seg{display:flex;background:var(--chip);border-radius:10px;padding:3px;margin-top:12px}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);font-size:15px;font-weight:600;padding:9px;border-radius:8px}
+.seg button.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .foot{font-size:12px;color:var(--muted);margin:14px 4px;line-height:1.5}
 </style>
 </head>
@@ -73,12 +78,24 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
 
   <div class="card">
     <div class="inputs">
-      <label>Güç
-        <div class="field"><input id="p" inputmode="decimal" autocomplete="off" value="5"><span>kW</span></div>
+      <label><span id="pLbl">Güç</span>
+        <div class="field"><input id="p" inputmode="decimal" autocomplete="off" value="5">
+          <select id="u" style="flex:0 0 auto;font-size:15px;color:var(--accent);padding-right:8px"><option value="kW">kW</option><option value="A">A</option></select></div>
       </label>
       <label>Kablo metrajı
         <div class="field"><input id="l" inputmode="decimal" autocomplete="off" value="25"><span>m</span></div>
       </label>
+    </div>
+    <div class="seg" id="mode">
+      <button data-v="bina">Bina içi</button>
+      <button data-v="yer">Yeraltı</button>
+    </div>
+    <div id="dBox">
+      <p style="font-size:13px;color:var(--muted);margin:12px 2px 0">Kablo nasıl döşenecek?</p>
+      <div class="seg" id="dm" style="margin-top:6px">
+        <button data-v="D1">Boru içinde</button>
+        <button data-v="D2">Doğrudan toprağa</button>
+      </div>
     </div>
     <p class="err" id="err"></p>
   </div>
@@ -89,16 +106,13 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
     <summary>Gelişmiş ayarlar <small id="advSum"></small></summary>
     <div class="adv">
       <label class="full">Montaj yöntemi
-        <div class="field"><select id="m">
-          <option value="A1">A1 · Isı yalıtımlı duvarda boru içinde iletken</option>
-          <option value="A2">A2 · Isı yalıtımlı duvarda boru içinde kablo</option>
-          <option value="B1">B1 · Duvarda / sıva altı boru içinde iletken</option>
-          <option value="B2">B2 · Duvarda / sıva altı boru içinde kablo</option>
-          <option value="C">C · Duvara doğrudan kelepçeli kablo</option>
-        </select></div>
+        <div class="field"><select id="m"></select></div>
       </label>
-      <label>Ortam sıcaklığı
+      <label><span id="tLbl">Ortam sıcaklığı</span>
         <div class="field"><select id="t"></select></div>
+      </label>
+      <label id="rBox">Toprak ısıl direnci
+        <div class="field"><select id="r"></select></div>
       </label>
       <label>Gruplanan devre
         <div class="field"><select id="g"></select></div>
@@ -124,7 +138,7 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
 
   <p class="foot">
     Gerilim düşümü: Elektrik İç Tesisleri Yönetmeliği formülü — tek faz %e = 200·P·L / (k·S·U²), üç faz %e = 100·P·L / (k·S·U²); k bakır 56, alüminyum 35.
-    Akım taşıma: IEC 60364-5-52 PVC yalıtımlı (70°C) tablolar, sıcaklık ve gruplama katsayılarıyla düzeltilir. Sigorta: Ib ≤ In ≤ Iz.
+    Akım taşıma: IEC 60364-5-52 PVC yalıtımlı (70°C) tablolar; bina içinde ortam sıcaklığı (30°C esas) ve gruplama, yeraltında toprak sıcaklığı (20°C esas), toprak ısıl direnci (2,5 K·m/W esas) ve gruplama katsayılarıyla düzeltilir. Sigorta: Ib ≤ In ≤ Iz.
     Kısa devre ve döngü empedansı kontrol edilmez. Sonuçlar ön boyutlandırmadır; proje için mühendis kontrolü gerekir.
   </p>
 </div>
@@ -140,30 +154,46 @@ const IZ={
        A2:[14,18.5,25,32,43,57,75,92,110,139,167,192,219,248,291],
        B1:[17.5,24,32,41,57,76,101,125,151,192,232,269,300,341,400],
        B2:[16.5,23,30,38,52,69,90,111,133,168,201,232,258,294,344],
-       C:[19.5,27,36,46,63,85,112,138,168,213,258,299,344,392,461]},
+       C:[19.5,27,36,46,63,85,112,138,168,213,258,299,344,392,461],
+       D1:[22,29,37,46,60,78,99,119,140,173,204,231,261,292,336],
+       D2:[22,28,38,48,64,83,110,132,156,192,230,261,293,331,382]},
     3:{A1:[13.5,18,24,31,42,56,73,89,108,136,164,188,216,245,286],
        A2:[13,17.5,23,29,39,52,68,83,99,125,150,172,196,223,261],
        B1:[15.5,21,28,36,50,68,89,110,134,171,207,239,262,296,346],
        B2:[15,20,27,34,46,62,80,99,118,149,179,206,225,255,297],
-       C:[17.5,24,32,41,57,76,96,119,144,184,223,259,299,341,403]}
+       C:[17.5,24,32,41,57,76,96,119,144,184,223,259,299,341,403],
+       D1:[18,24,30,38,50,64,82,98,116,143,169,192,217,243,280],
+       D2:[19,24,33,41,54,70,92,110,130,162,193,220,246,278,320]}
   },
   al:{
     2:{A1:[48,63,77,93,118,142,164,189,215,252],
        A2:[44,58,71,86,108,130,150,172,195,229],
        B1:[60,80,99,119,151,182,210,240,273,320],
        B2:[53,71,86,104,131,157,181,201,230,269],
-       C:[66,83,103,125,160,195,226,261,298,352]},
+       C:[66,83,103,125,160,195,226,261,298,352],
+       D1:[62,80,96,113,140,166,189,213,240,277],
+       D2:[64,85,102,121,150,179,204,229,258,297]},
     3:{A1:[44,58,71,86,108,130,150,172,195,229],
        A2:[41,53,65,78,98,118,135,155,176,207],
        B1:[53,70,86,104,133,161,186,204,230,269],
        B2:[48,62,77,92,116,139,160,176,199,232],
-       C:[59,73,90,110,140,170,197,227,259,305]}
+       C:[59,73,90,110,140,170,197,227,259,305],
+       D1:[52,67,80,94,117,138,157,178,200,230],
+       D2:[54,71,85,101,125,150,171,193,217,250]}
   }
 };
+/* Havada: ortam sıcaklığı (30°C esas), gruplama (demet / yüzeyde) */
 const KT={10:1.22,15:1.17,20:1.12,25:1.06,30:1.00,35:0.94,40:0.87,45:0.79,50:0.71,55:0.61};
 const KG={1:1,2:0.80,3:0.70,4:0.65,5:0.60,6:0.57,7:0.54,8:0.52,9:0.50,12:0.45,16:0.41,20:0.38};
+/* Toprakta: toprak sıcaklığı (20°C esas), ısıl direnç (2,5 K·m/W esas), gruplama (bitişik) */
+const KTG={10:1.10,15:1.05,20:1.00,25:0.95,30:0.89,35:0.84,40:0.77};
+const KR={D1:{0.5:1.28,0.7:1.20,1:1.18,1.5:1.10,2:1.05,2.5:1.00,3:0.96},
+          D2:{0.5:1.88,0.7:1.62,1:1.50,1.5:1.28,2:1.12,2.5:1.00,3:0.90}};
+const KGG={D1:{1:1,2:0.85,3:0.75,4:0.70,5:0.65,6:0.60},
+           D2:{1:1,2:0.75,3:0.65,4:0.60,5:0.55,6:0.50}};
 const BRK=[6,10,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400];
-const DEF={m:'B2',t:30,g:1,e:3,c:0.9,u1:230,u3:400};
+const DEF={mode:'bina',unit:'kW',e:3,c:0.9,u1:230,u3:400,
+  bina:{m:'B2',t:30,g:1}, yer:{m:'D1',t:20,g:1,r:2.5}};
 
 /* ---------- Hesap motoru ---------- */
 function num(v){ if(v==null) return NaN; return parseFloat(String(v).replace(/\s/g,'').replace(',','.')); }
@@ -172,12 +202,16 @@ function fs(s){ return String(s).replace('.',','); }
 
 function calc(o){ /* o: {P(W), L(m), tri, al, m, t, g, e, c, u1, u3} */
   const U=o.tri?o.u3:o.u1, k=o.al?35:56;
-  const Ib=o.tri? o.P/(Math.sqrt(3)*U*o.c) : o.P/(U*o.c);
-  const kt=KT[o.t]||1, kg=KG[o.g]||1;
+  let Ib, P;
+  if(o.I>0){ Ib=o.I; P=(o.tri?Math.sqrt(3):1)*U*o.I*o.c; }
+  else { P=o.P; Ib=o.tri? P/(Math.sqrt(3)*U*o.c) : P/(U*o.c); }
+  o=Object.assign({},o,{P});
+  const D=o.m==='D1'||o.m==='D2';
+  const kt=(D?KTG:KT)[o.t]||1, kg=(D?KGG[o.m]:KG)[o.g]||1, kr=D?(KR[o.m][o.r]||1):1;
   const sizes=o.al?AL_S:CU_S, tab=IZ[o.al?'al':'cu'][o.tri?3:2][o.m];
   const In=BRK.find(b=>b>=Ib-1e-9);
   const rows=sizes.map((S,i)=>{
-    const Iz=tab[i]*kt*kg;
+    const Iz=tab[i]*kt*kg*kr;
     const e=(o.tri?100:200)*o.P*o.L/(k*S*U*U);
     let why='';
     if(Iz<Ib) why='Akım yetersiz';
@@ -185,33 +219,51 @@ function calc(o){ /* o: {P(W), L(m), tri, al, m, t, g, e, c, u1, u3} */
     else if(e>o.e) why='Düşüm fazla';
     return {S,Iz,e,In,ok:!why,why};
   });
-  return {Ib,In,U,rows,ok:rows.filter(r=>r.ok)};
+  return {Ib,In,U,P,rows,ok:rows.filter(r=>r.ok)};
 }
 
-function cableName(S,tri,al){
+function cableName(S,tri,al,under){
   const n=tri?5:3;
   if(al) return 'NAYY '+n+'×'+fs(S);
-  return (S<=16?'NYM ':'NYY ')+n+'×'+fs(S);
+  return (S<=16&&!under?'NYM ':'NYY ')+n+'×'+fs(S);
 }
 
 /* ---------- Arayüz ---------- */
 const $=id=>document.getElementById(id);
-const st=Object.assign({},DEF,{p:'5',l:'25'});
+const clone=o=>JSON.parse(JSON.stringify(o));
+const st=Object.assign(clone(DEF),{p:'5',l:'25'});
 const open={};
-function load(){ try{ const s=JSON.parse(localStorage.getItem('kablohesap')||'null'); if(s) Object.assign(st,s); }catch(e){} }
+const MBINA=[['A1','A1 · Isı yalıtımlı duvarda boru içinde iletken'],['A2','A2 · Isı yalıtımlı duvarda boru içinde kablo'],
+  ['B1','B1 · Duvarda / sıva altı boru içinde iletken'],['B2','B2 · Duvarda / sıva altı boru içinde kablo'],['C','C · Duvara doğrudan kelepçeli kablo']];
+const MYER=[['D1','D1 · Toprakta boru (künk) içinde kablo'],['D2','D2 · Doğrudan toprağa gömülü kablo']];
+const sortK=o=>Object.keys(o).sort((a,b)=>a-b);
+function load(){ try{ const s=JSON.parse(localStorage.getItem('kablohesap')||'null');
+  if(s&&s.bina&&s.yer){ Object.assign(st,s); st.bina=Object.assign(clone(DEF.bina),s.bina); st.yer=Object.assign(clone(DEF.yer),s.yer); } }catch(e){} }
 function save(){ try{ localStorage.setItem('kablohesap',JSON.stringify(st)); }catch(e){} }
+const cur=()=>st[st.mode];
 
 function fillSelects(){
-  $('t').innerHTML=Object.keys(KT).map(t=>`<option value="${t}">${t} °C</option>`).join('');
-  $('g').innerHTML=Object.keys(KG).map(g=>`<option value="${g}">${g}${g==='1'?' (tek devre)':' devre'}</option>`).join('');
+  const y=st.mode==='yer', c=cur();
+  $('m').innerHTML=(y?MYER:MBINA).map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+  $('t').innerHTML=sortK(y?KTG:KT).map(t=>`<option value="${t}">${t} °C</option>`).join('');
+  $('g').innerHTML=sortK(y?KGG[c.m]:KG).map(g=>`<option value="${g}">${g}${g==='1'?' (tek devre)':' devre'}</option>`).join('');
+  $('r').innerHTML=sortK(KR.D1).map(r=>`<option value="${r}">${fs(r)} K·m/W${r==='1'?' (nemli)':r==='2.5'?' (kuru, güvenli)':''}</option>`).join('');
+  $('tLbl').textContent=y?'Toprak sıcaklığı':'Ortam sıcaklığı';
+  $('rBox').style.display=y?'':'none';
+  document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.v===st.mode));
+  $('dBox').style.display=y?'':'none';
+  document.querySelectorAll('#dm button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.m));
+  if(!(c.g in (y?KGG[c.m]:KG))) c.g=1;
 }
 function toUI(){
-  $('p').value=st.p; $('l').value=st.l; $('m').value=st.m; $('t').value=String(st.t); $('g').value=String(st.g);
+  const c=cur(); fillSelects();
+  $('p').value=st.p; $('l').value=st.l; $('m').value=c.m; $('t').value=String(c.t); $('g').value=String(c.g);
+  if(c.r!=null) $('r').value=String(c.r);
   $('e').value=fs(st.e); $('c').value=fs(st.c); $('u1').value=st.u1; $('u3').value=st.u3;
 }
 function readAdv(){
-  const e=num($('e').value), c=num($('c').value), u1=num($('u1').value), u3=num($('u3').value);
-  st.m=$('m').value; st.t=+$('t').value; st.g=+$('g').value;
+  const e=num($('e').value), c=num($('c').value), u1=num($('u1').value), u3=num($('u3').value), k=cur();
+  k.m=$('m').value; k.t=+$('t').value; k.g=+$('g').value; if(st.mode==='yer') k.r=+$('r').value;
   if(e>0&&e<=20) st.e=e; if(c>0&&c<=1) st.c=c; if(u1>=100) st.u1=u1; if(u3>=100) st.u3=u3;
 }
 
@@ -224,9 +276,9 @@ function card(key,title,tri,al,base){
     h+=`<div class="big no">Uygun kesit yok</div><div class="stats"><div>Akım <b>${fmt(r.Ib,1)} A</b></div></div>`;
     if(!tri) h+=`<div class="note">Bu güç tek faz için çok yüksek, üç faz kullanın.</div>`;
   }else{
-    h+=`<div class="big">${cableName(best.S,tri,al)} mm²</div>
+    h+=`<div class="big">${cableName(best.S,tri,al,base.under)} mm²</div>
       <div class="stats">
-        <div>Akım <b>${fmt(r.Ib,1)} A</b></div>
+        <div>${base.I>0?'Güç':'Akım'} <b>${base.I>0?fmt(r.P/1000,1)+' kW':fmt(r.Ib,1)+' A'}</b></div>
         <div>Kapasite <b>${fmt(best.Iz,0)} A</b></div>
         <div>Gerilim düşümü <b>%${fmt(best.e,2)}</b></div>
         <div>Doluluk <b>%${fmt(r.Ib/best.Iz*100,0)}</b></div>
@@ -237,6 +289,7 @@ function card(key,title,tri,al,base){
     if(!tri && r.Ib>40) h+=`<div class="note">Tek faz için akım yüksek (${fmt(r.Ib,0)} A). Üç faz önerilir.</div>`;
     if(al) h+=`<div class="note">Alüminyumda en küçük kesit 16 mm² alınmıştır.</div>`;
   }
+  if(!best&&!tri&&base.I>0) h=h.replace('Bu güç tek faz için çok yüksek','Bu akım tek faz için çok yüksek');
   const isOpen=!!open[key];
   h+=`<button class="more" data-k="${key}">${isOpen?'Kesit tablosunu gizle':'Tüm kesitleri gör'}</button>`;
   if(isOpen){
@@ -249,23 +302,26 @@ function card(key,title,tri,al,base){
 }
 
 function run(){
-  st.p=$('p').value; st.l=$('l').value; readAdv(); save();
-  const P=num(st.p)*1000, L=num(st.l);
-  $('advSum').textContent=`${st.m} · ${st.t}°C · ${st.g} devre · %${fs(st.e)} · cos φ ${fs(st.c)}`;
-  if(!(P>0)||!(L>0)){ $('err').textContent='Güç ve metraj sıfırdan büyük olmalı.'; $('out').innerHTML=''; last=null; return; }
+  st.p=$('p').value; st.l=$('l').value; st.unit=$('u').value; readAdv(); save();
+  const k=cur(), amp=st.unit==='A', v=num(st.p), L=num(st.l);
+  $('pLbl').textContent=amp?'Akım':'Güç';
+  $('advSum').textContent=`${k.m} · ${k.t}°C · ${k.g} devre${st.mode==='yer'?' · '+fs(k.r)+' K·m/W':''} · %${fs(st.e)} · cos φ ${fs(st.c)}`;
+  if(!(v>0)||!(L>0)){ $('err').textContent=(amp?'Akım':'Güç')+' ve metraj sıfırdan büyük olmalı.'; $('out').innerHTML=''; last=null; return; }
   $('err').textContent='';
-  const base={P,L,m:st.m,t:st.t,g:st.g,e:st.e,c:st.c,u1:st.u1,u3:st.u3};
+  const base={P:amp?0:v*1000,I:amp?v:0,L,m:k.m,t:k.t,g:k.g,r:k.r,e:st.e,c:st.c,u1:st.u1,u3:st.u3,under:st.mode==='yer'};
   const a=card('1c','Tek faz · Bakır',false,false,base), b=card('3c','Üç faz · Bakır',true,false,base),
         c=card('1a','Tek faz · Alüminyum',false,true,base), d=card('3a','Üç faz · Alüminyum',true,true,base);
-  $('out').innerHTML=`<div class="grp">BAKIR</div>${a.h}${b.h}<div class="grp">ALÜMİNYUM</div>${c.h}${d.h}`;
-  last={P,L,list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
+  const yn=base.under?`<div class="note" style="margin:0 0 12px">Yeraltında NYM kullanılmaz; bakırda NYY, alüminyumda NAYY verilir. Kum yatağı ve koruma tuğlası/bant unutulmasın.</div>`:'';
+  $('out').innerHTML=`${yn}<div class="grp">BAKIR</div>${a.h}${b.h}<div class="grp">ALÜMİNYUM</div>${c.h}${d.h}`;
+  last={under:base.under,list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
 }
 
 function shareText(){
   if(!last) return '';
-  let t=`Kablo kesit hesabı\nGüç: ${fs(st.p)} kW · Metraj: ${fs(st.l)} m\nMontaj ${st.m}, ${st.t}°C, ${st.g} devre, maks. %${fs(st.e)}\n\n`;
+  const k=cur();
+  let t=`Kablo kesit hesabı (${last.under?'yeraltı':'bina içi'})\n${st.unit==='A'?'Akım':'Güç'}: ${fs(st.p)} ${st.unit==='A'?'A':'kW'} · Metraj: ${fs(st.l)} m\nMontaj ${k.m}, ${k.t}°C, ${k.g} devre${last.under?', '+fs(k.r)+' K·m/W':''}, maks. %${fs(st.e)}\n\n`;
   last.list.forEach(([n,x,tri,al])=>{
-    t+= x.best ? `${n}: ${cableName(x.best.S,tri,al)} mm² · ${fmt(x.r.Ib,1)} A · %e ${fmt(x.best.e,2)} · sigorta ${x.best.In} A\n` : `${n}: uygun kesit yok\n`;
+    t+= x.best ? `${n}: ${cableName(x.best.S,tri,al,last.under)} mm² · ${fmt(x.r.Ib,1)} A · %e ${fmt(x.best.e,2)} · sigorta ${x.best.In} A\n` : `${n}: uygun kesit yok\n`;
   });
   return t;
 }
@@ -274,8 +330,11 @@ document.addEventListener('click',ev=>{
   const b=ev.target.closest('.more'); if(b){ const k=b.dataset.k; open[k]=!open[k]; run(); }
 });
 ['p','l','e','c','u1','u3'].forEach(id=>$(id).addEventListener('input',run));
-['m','t','g'].forEach(id=>$(id).addEventListener('change',run));
-$('reset').addEventListener('click',()=>{ Object.assign(st,DEF); toUI(); run(); });
+['t','g','r','u'].forEach(id=>$(id).addEventListener('change',run));
+$('m').addEventListener('change',()=>{ readAdv(); toUI(); run(); });
+document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.mode=b.dataset.v; toUI(); run(); }));
+document.querySelectorAll('#dm button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.yer.m=b.dataset.v; toUI(); run(); }));
+$('reset').addEventListener('click',()=>{ const keep={p:st.p,l:st.l,unit:st.unit,mode:st.mode}; Object.assign(st,clone(DEF),keep); toUI(); run(); });
 $('share').addEventListener('click',()=>{
   const t=shareText(); if(!t) return;
   if(window.Android&&Android.share) Android.share(t);
@@ -286,7 +345,7 @@ window.appBack=function(){ const d=$('advBox'); if(d.open){ d.open=false; return
 $('p').addEventListener('focus',e=>e.target.select()); $('l').addEventListener('focus',e=>e.target.select());
 
 if(typeof module!=='undefined') module.exports={calc};
-load(); fillSelects(); toUI(); run();
+load(); toUI(); $('u').value=st.unit||'kW'; run();
 </script>
 </body>
 </html>
