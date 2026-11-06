@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kablo Hesap</title>
+<style>
+:root{
+  --accent:#1E5FA8; --accent-soft:#E4EEF9; --on-accent:#fff;
+  --ok:#1F6B4F; --ok-soft:#E3F2EA; --warn:#9A4508; --warn-soft:#FDF1E2; --bad:#A3302D; --bad-soft:#FBE9E8;
+  --bg:#F3F5F8; --surface:#FFFFFF; --border:#DDE3EA; --divider:#EDF0F4; --text:#1B222B; --muted:#5E6875; --chip:#EEF1F5;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --accent:#6FA8E8; --accent-soft:#1D2E44; --on-accent:#0D1520;
+    --ok:#6CCB9F; --ok-soft:#173027; --warn:#F0B26B; --warn-soft:#3A2814; --bad:#F08C88; --bad-soft:#3B1C1B;
+    --bg:#11151B; --surface:#1A2029; --border:#2C3542; --divider:#232B36; --text:#E7ECF2; --muted:#9AA5B2; --chip:#232B36;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:560px;margin:0 auto;padding:14px 14px 40px}
+h1{font-size:20px;font-weight:600;margin:4px 2px 12px;display:flex;align-items:center;gap:8px}
+h1 small{font-size:12px;font-weight:400;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:13px;color:var(--muted)}
+.field{display:flex;align-items:center;border:1px solid var(--border);border-radius:10px;margin-top:5px;background:var(--surface)}
+.field:focus-within{border-color:var(--accent)}
+.field input,.field select{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:600;padding:10px 10px;outline:none}
+.field select{font-size:15px;font-weight:500;padding:10px 6px}
+.field span{padding-right:10px;color:var(--muted);font-size:14px}
+.err{color:var(--bad);font-size:13px;min-height:0;margin:8px 0 0}
+.err:empty{display:none}
+.grp{font-size:13px;color:var(--muted);margin:16px 4px 8px;font-weight:600;letter-spacing:.2px}
+.res h3{margin:0;font-size:13px;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--accent-soft);color:var(--accent)}
+.big{font-size:26px;font-weight:700;margin:6px 0 2px;letter-spacing:-.3px}
+.big.no{font-size:19px;color:var(--bad)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;font-size:14px}
+.stats div{display:flex;justify-content:space-between;border-bottom:1px solid var(--divider);padding:3px 0}
+.stats b{font-weight:600}
+.chips{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:13px;padding:4px 10px;border-radius:20px;background:var(--ok-soft);color:var(--ok);font-weight:500}
+.note{font-size:12.5px;margin-top:8px;padding:6px 9px;border-radius:8px;background:var(--warn-soft);color:var(--warn)}
+.more{margin-top:10px;font-size:13px;color:var(--accent);background:none;border:0;padding:4px 0;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th{color:var(--muted);font-weight:500;text-align:right;padding:4px 3px;border-bottom:1px solid var(--divider)}
+td{text-align:right;padding:6px 3px;border-bottom:1px solid var(--divider)}
+th:first-child,td:first-child{text-align:left}
+tr.best td{background:var(--accent-soft);font-weight:600}
+.st{font-size:11.5px;padding:2px 6px;border-radius:6px;white-space:nowrap}
+.st.ok{background:var(--ok-soft);color:var(--ok)} .st.bad{background:var(--bad-soft);color:var(--bad)}
+details{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:12px}
+summary{padding:13px 14px;font-weight:600;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right;max-width:62%}
+.adv{padding:0 14px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.adv .full{grid-column:1/-1}
+.adv .field input{font-size:16px}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;padding:10px 12px;font-size:14px;font-weight:600}
+.btn.pri{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.row{display:flex;gap:10px}
+.row .btn{flex:1}
+.foot{font-size:12px;color:var(--muted);margin:14px 4px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kablo Hesap <small>IEC 60364-5-52</small></h1>
+
+  <div class="card">
+    <div class="inputs">
+      <label>Güç
+        <div class="field"><input id="p" inputmode="decimal" autocomplete="off" value="5"><span>kW</span></div>
+      </label>
+      <label>Kablo metrajı
+        <div class="field"><input id="l" inputmode="decimal" autocomplete="off" value="25"><span>m</span></div>
+      </label>
+    </div>
+    <p class="err" id="err"></p>
+  </div>
+
+  <div id="out"></div>
+
+  <details id="advBox">
+    <summary>Gelişmiş ayarlar <small id="advSum"></small></summary>
+    <div class="adv">
+      <label class="full">Montaj yöntemi
+        <div class="field"><select id="m">
+          <option value="A1">A1 · Isı yalıtımlı duvarda boru içinde iletken</option>
+          <option value="A2">A2 · Isı yalıtımlı duvarda boru içinde kablo</option>
+          <option value="B1">B1 · Duvarda / sıva altı boru içinde iletken</option>
+          <option value="B2">B2 · Duvarda / sıva altı boru içinde kablo</option>
+          <option value="C">C · Duvara doğrudan kelepçeli kablo</option>
+        </select></div>
+      </label>
+      <label>Ortam sıcaklığı
+        <div class="field"><select id="t"></select></div>
+      </label>
+      <label>Gruplanan devre
+        <div class="field"><select id="g"></select></div>
+      </label>
+      <label>Maks. gerilim düşümü
+        <div class="field"><input id="e" inputmode="decimal"><span>%</span></div>
+      </label>
+      <label>cos φ
+        <div class="field"><input id="c" inputmode="decimal"></div>
+      </label>
+      <label>Tek faz gerilim
+        <div class="field"><input id="u1" inputmode="numeric"><span>V</span></div>
+      </label>
+      <label>Üç faz gerilim
+        <div class="field"><input id="u3" inputmode="numeric"><span>V</span></div>
+      </label>
+      <div class="full row">
+        <button class="btn" id="reset">Varsayılana dön</button>
+        <button class="btn pri" id="share">Sonucu paylaş</button>
+      </div>
+    </div>
+  </details>
+
+  <p class="foot">
+    Gerilim düşümü: Elektrik İç Tesisleri Yönetmeliği formülü — tek faz %e = 200·P·L / (k·S·U²), üç faz %e = 100·P·L / (k·S·U²); k bakır 56, alüminyum 35.
+    Akım taşıma: IEC 60364-5-52 PVC yalıtımlı (70°C) tablolar, sıcaklık ve gruplama katsayılarıyla düzeltilir. Sigorta: Ib ≤ In ≤ Iz.
+    Kısa devre ve döngü empedansı kontrol edilmez. Sonuçlar ön boyutlandırmadır; proje için mühendis kontrolü gerekir.
+  </p>
+</div>
+
+<script>
+'use strict';
+/* ---------- Tablolar (IEC 60364-5-52, PVC, 70°C iletken, 30°C ortam) ---------- */
+const CU_S=[1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240];
+const AL_S=[16,25,35,50,70,95,120,150,185,240];
+const IZ={
+  cu:{ /* 2 yüklü iletken (tek faz) | 3 yüklü iletken (üç faz) */
+    2:{A1:[14.5,19.5,26,34,46,61,80,99,119,151,182,210,240,273,321],
+       A2:[14,18.5,25,32,43,57,75,92,110,139,167,192,219,248,291],
+       B1:[17.5,24,32,41,57,76,101,125,151,192,232,269,300,341,400],
+       B2:[16.5,23,30,38,52,69,90,111,133,168,201,232,258,294,344],
+       C:[19.5,27,36,46,63,85,112,138,168,213,258,299,344,392,461]},
+    3:{A1:[13.5,18,24,31,42,56,73,89,108,136,164,188,216,245,286],
+       A2:[13,17.5,23,29,39,52,68,83,99,125,150,172,196,223,261],
+       B1:[15.5,21,28,36,50,68,89,110,134,171,207,239,262,296,346],
+       B2:[15,20,27,34,46,62,80,99,118,149,179,206,225,255,297],
+       C:[17.5,24,32,41,57,76,96,119,144,184,223,259,299,341,403]}
+  },
+  al:{
+    2:{A1:[48,63,77,93,118,142,164,189,215,252],
+       A2:[44,58,71,86,108,130,150,172,195,229],
+       B1:[60,80,99,119,151,182,210,240,273,320],
+       B2:[53,71,86,104,131,157,181,201,230,269],
+       C:[66,83,103,125,160,195,226,261,298,352]},
+    3:{A1:[44,58,71,86,108,130,150,172,195,229],
+       A2:[41,53,65,78,98,118,135,155,176,207],
+       B1:[53,70,86,104,133,161,186,204,230,269],
+       B2:[48,62,77,92,116,139,160,176,199,232],
+       C:[59,73,90,110,140,170,197,227,259,305]}
+  }
+};
+const KT={10:1.22,15:1.17,20:1.12,25:1.06,30:1.00,35:0.94,40:0.87,45:0.79,50:0.71,55:0.61};
+const KG={1:1,2:0.80,3:0.70,4:0.65,5:0.60,6:0.57,7:0.54,8:0.52,9:0.50,12:0.45,16:0.41,20:0.38};
+const BRK=[6,10,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400];
+const DEF={m:'B2',t:30,g:1,e:3,c:0.9,u1:230,u3:400};
+
+/* ---------- Hesap motoru ---------- */
+function num(v){ if(v==null) return NaN; return parseFloat(String(v).replace(/\s/g,'').replace(',','.')); }
+function fmt(x,d){ return (Math.round(x*Math.pow(10,d))/Math.pow(10,d)).toFixed(d).replace('.',','); }
+function fs(s){ return String(s).replace('.',','); }
+
+function calc(o){ /* o: {P(W), L(m), tri, al, m, t, g, e, c, u1, u3} */
+  const U=o.tri?o.u3:o.u1, k=o.al?35:56;
+  const Ib=o.tri? o.P/(Math.sqrt(3)*U*o.c) : o.P/(U*o.c);
+  const kt=KT[o.t]||1, kg=KG[o.g]||1;
+  const sizes=o.al?AL_S:CU_S, tab=IZ[o.al?'al':'cu'][o.tri?3:2][o.m];
+  const In=BRK.find(b=>b>=Ib-1e-9);
+  const rows=sizes.map((S,i)=>{
+    const Iz=tab[i]*kt*kg;
+    const e=(o.tri?100:200)*o.P*o.L/(k*S*U*U);
+    let why='';
+    if(Iz<Ib) why='Akım yetersiz';
+    else if(!In||In>Iz) why='Sigorta uymuyor';
+    else if(e>o.e) why='Düşüm fazla';
+    return {S,Iz,e,In,ok:!why,why};
+  });
+  return {Ib,In,U,rows,ok:rows.filter(r=>r.ok)};
+}
+
+function cableName(S,tri,al){
+  const n=tri?5:3;
+  if(al) return 'NAYY '+n+'×'+fs(S);
+  return (S<=16?'NYM ':'NYY ')+n+'×'+fs(S);
+}
+
+/* ---------- Arayüz ---------- */
+const $=id=>document.getElementById(id);
+const st=Object.assign({},DEF,{p:'5',l:'25'});
+const open={};
+function load(){ try{ const s=JSON.parse(localStorage.getItem('kablohesap')||'null'); if(s) Object.assign(st,s); }catch(e){} }
+function save(){ try{ localStorage.setItem('kablohesap',JSON.stringify(st)); }catch(e){} }
+
+function fillSelects(){
+  $('t').innerHTML=Object.keys(KT).map(t=>`<option value="${t}">${t} °C</option>`).join('');
+  $('g').innerHTML=Object.keys(KG).map(g=>`<option value="${g}">${g}${g==='1'?' (tek devre)':' devre'}</option>`).join('');
+}
+function toUI(){
+  $('p').value=st.p; $('l').value=st.l; $('m').value=st.m; $('t').value=String(st.t); $('g').value=String(st.g);
+  $('e').value=fs(st.e); $('c').value=fs(st.c); $('u1').value=st.u1; $('u3').value=st.u3;
+}
+function readAdv(){
+  const e=num($('e').value), c=num($('c').value), u1=num($('u1').value), u3=num($('u3').value);
+  st.m=$('m').value; st.t=+$('t').value; st.g=+$('g').value;
+  if(e>0&&e<=20) st.e=e; if(c>0&&c<=1) st.c=c; if(u1>=100) st.u1=u1; if(u3>=100) st.u3=u3;
+}
+
+let last=null;
+function card(key,title,tri,al,base){
+  const r=calc(Object.assign({},base,{tri,al}));
+  const best=r.ok[0], alt=r.ok.slice(1,3);
+  let h=`<div class="card res"><h3>${title}<span class="badge">${tri?st.u3:st.u1} V</span></h3>`;
+  if(!best){
+    h+=`<div class="big no">Uygun kesit yok</div><div class="stats"><div>Akım <b>${fmt(r.Ib,1)} A</b></div></div>`;
+    if(!tri) h+=`<div class="note">Bu güç tek faz için çok yüksek, üç faz kullanın.</div>`;
+  }else{
+    h+=`<div class="big">${cableName(best.S,tri,al)} mm²</div>
+      <div class="stats">
+        <div>Akım <b>${fmt(r.Ib,1)} A</b></div>
+        <div>Kapasite <b>${fmt(best.Iz,0)} A</b></div>
+        <div>Gerilim düşümü <b>%${fmt(best.e,2)}</b></div>
+        <div>Doluluk <b>%${fmt(r.Ib/best.Iz*100,0)}</b></div>
+        <div>Sigorta <b>${best.In<=63?'C':'TMŞ '}${best.In} A</b></div>
+        <div>Kaçak akım <b>${best.In<=63?'30 mA':'300 mA'}</b></div>
+      </div>`;
+    if(alt.length) h+=`<div class="chips">${alt.map(a=>`<span class="chip">Olabilir ${fs(a.S)} mm² · %${fmt(a.e,2)}</span>`).join('')}</div>`;
+    if(!tri && r.Ib>40) h+=`<div class="note">Tek faz için akım yüksek (${fmt(r.Ib,0)} A). Üç faz önerilir.</div>`;
+    if(al) h+=`<div class="note">Alüminyumda en küçük kesit 16 mm² alınmıştır.</div>`;
+  }
+  const isOpen=!!open[key];
+  h+=`<button class="more" data-k="${key}">${isOpen?'Kesit tablosunu gizle':'Tüm kesitleri gör'}</button>`;
+  if(isOpen){
+    h+=`<table><tr><th>Kesit</th><th>Kapasite</th><th>%e</th><th>Durum</th></tr>`+
+      r.rows.map(x=>`<tr class="${best&&x.S===best.S?'best':''}"><td>${fs(x.S)} mm²</td><td>${fmt(x.Iz,0)} A</td><td>${fmt(x.e,2)}</td><td><span class="st ${x.ok?'ok':'bad'}">${x.ok?(best&&x.S===best.S?'En uygun':'Uygun'):x.why}</span></td></tr>`).join('')+
+      `</table>`;
+  }
+  h+=`</div>`;
+  return {h,r,best};
+}
+
+function run(){
+  st.p=$('p').value; st.l=$('l').value; readAdv(); save();
+  const P=num(st.p)*1000, L=num(st.l);
+  $('advSum').textContent=`${st.m} · ${st.t}°C · ${st.g} devre · %${fs(st.e)} · cos φ ${fs(st.c)}`;
+  if(!(P>0)||!(L>0)){ $('err').textContent='Güç ve metraj sıfırdan büyük olmalı.'; $('out').innerHTML=''; last=null; return; }
+  $('err').textContent='';
+  const base={P,L,m:st.m,t:st.t,g:st.g,e:st.e,c:st.c,u1:st.u1,u3:st.u3};
+  const a=card('1c','Tek faz · Bakır',false,false,base), b=card('3c','Üç faz · Bakır',true,false,base),
+        c=card('1a','Tek faz · Alüminyum',false,true,base), d=card('3a','Üç faz · Alüminyum',true,true,base);
+  $('out').innerHTML=`<div class="grp">BAKIR</div>${a.h}${b.h}<div class="grp">ALÜMİNYUM</div>${c.h}${d.h}`;
+  last={P,L,list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
+}
+
+function shareText(){
+  if(!last) return '';
+  let t=`Kablo kesit hesabı\nGüç: ${fs(st.p)} kW · Metraj: ${fs(st.l)} m\nMontaj ${st.m}, ${st.t}°C, ${st.g} devre, maks. %${fs(st.e)}\n\n`;
+  last.list.forEach(([n,x,tri,al])=>{
+    t+= x.best ? `${n}: ${cableName(x.best.S,tri,al)} mm² · ${fmt(x.r.Ib,1)} A · %e ${fmt(x.best.e,2)} · sigorta ${x.best.In} A\n` : `${n}: uygun kesit yok\n`;
+  });
+  return t;
+}
+
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('.more'); if(b){ const k=b.dataset.k; open[k]=!open[k]; run(); }
+});
+['p','l','e','c','u1','u3'].forEach(id=>$(id).addEventListener('input',run));
+['m','t','g'].forEach(id=>$(id).addEventListener('change',run));
+$('reset').addEventListener('click',()=>{ Object.assign(st,DEF); toUI(); run(); });
+$('share').addEventListener('click',()=>{
+  const t=shareText(); if(!t) return;
+  if(window.Android&&Android.share) Android.share(t);
+  else if(navigator.share) navigator.share({text:t}).catch(()=>{});
+  else if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>{ $('share').textContent='Kopyalandı'; setTimeout(()=>$('share').textContent='Sonucu paylaş',1500); });
+});
+window.appBack=function(){ const d=$('advBox'); if(d.open){ d.open=false; return true; } return false; };
+$('p').addEventListener('focus',e=>e.target.select()); $('l').addEventListener('focus',e=>e.target.select());
+
+if(typeof module!=='undefined') module.exports={calc};
+load(); fillSelects(); toUI(); run();
+</script>
+</body>
+</html>

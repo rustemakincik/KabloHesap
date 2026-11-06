@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.rustem.kablohesap'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.rustem.kablohesap'
+        minSdk 26
+        targetSdk 34
+        versionCode((project.findProperty('vc') ?: '1') as Integer)
+        versionName "1.0." + (project.findProperty('vc') ?: '1')
+    }
+
+    signingConfigs {
+        sabit {
+            storeFile rootProject.file('keystore/kablohesap.jks')
+            storePassword 'kablohesap'
+            keyAlias 'kablohesap'
+            keyPassword 'kablohesap'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.sabit
+        }
+        debug {
+            signingConfig signingConfigs.sabit
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
