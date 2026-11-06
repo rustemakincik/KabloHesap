@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kablo Hesap şifre üretici</title>
+<style>
+:root{--accent:#1E5FA8;--bg:#F3F5F8;--surface:#fff;--border:#DDE3EA;--text:#1B222B;--muted:#5E6875;--ok:#1F6B4F;--ok-soft:#E3F2EA;--warn:#9A4508;--warn-soft:#FDF1E2;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--accent:#6FA8E8;--bg:#11151B;--surface:#1A2029;--border:#2C3542;--text:#E7ECF2;--muted:#9AA5B2;--ok:#6CCB9F;--ok-soft:#173027;--warn:#F0B26B;--warn-soft:#3A2814;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Roboto,sans-serif}
+.w{max-width:440px;margin:0 auto;padding:20px 14px 40px}h1{font-size:20px;margin:4px 2px 14px}
+.c{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:10px}
+input{width:100%;margin-top:5px;font-size:22px;font-weight:700;letter-spacing:3px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);text-transform:uppercase}
+input[type=date]{letter-spacing:0;font-size:17px;font-weight:500}
+.p{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;margin-top:10px}
+.p small{display:block;font-size:12px;opacity:.85}.p b{font-size:28px;letter-spacing:4px;font-family:ui-monospace,monospace}
+.s{background:var(--ok-soft);color:var(--ok)}.g{background:var(--warn-soft);color:var(--warn)}
+button{border:0;background:transparent;color:inherit;font-weight:600;font-size:13px;padding:6px 8px}
+.err{color:#c0392b;font-size:13px;min-height:18px;margin:0}
+</style></head><body><div class="w">
+<h1>Kablo Hesap · şifre üretici</h1>
+<div class="c">
+<label>Cihaz kodu<input id="code" maxlength="7" autocomplete="off" placeholder="ABC 234"></label>
+<label>Günlük şifrenin geçerli olacağı gün<input id="date" type="date"></label>
+<p class="err" id="err"></p>
+<div id="out"></div>
+</div>
+<p style="font-size:12px;color:var(--muted);margin:0 4px">Günlük şifre yalnızca seçilen gün geçerlidir; ertesi gün aynı kod için yeni günlük şifre üretin. Sınırsız şifre o cihaz kodunda süresiz açar. Uygulama silinip yüklenirse kod değişir.</p>
+</div>
+<script>
+/* ---------- Aktivasyon: kod → şifre (HMAC-SHA256) ---------- */
+const KH_SECRET='4c8439a8c486efead9d693313a64d14f41a665b3eef8fe35';
+function sha256(m){
+  const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const l=m.length, nb=((l+9+63)>>6)<<6, b=new Uint8Array(nb); b.set(m); b[l]=0x80;
+  const bits=l*8; b[nb-4]=bits>>>24; b[nb-3]=bits>>>16; b[nb-2]=bits>>>8; b[nb-1]=bits;
+  const w=new Uint32Array(64), r=(x,n)=>(x>>>n)|(x<<(32-n));
+  for(let o=0;o<nb;o+=64){
+    for(let i=0;i<16;i++) w[i]=(b[o+4*i]<<24)|(b[o+4*i+1]<<16)|(b[o+4*i+2]<<8)|b[o+4*i+3];
+    for(let i=16;i<64;i++){ const s0=r(w[i-15],7)^r(w[i-15],18)^(w[i-15]>>>3), s1=r(w[i-2],17)^r(w[i-2],19)^(w[i-2]>>>10); w[i]=(w[i-16]+s0+w[i-7]+s1)|0; }
+    let [a,bb,c,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){
+      const t1=(h+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+K[i]+w[i])|0;
+      const t2=((r(a,2)^r(a,13)^r(a,22))+((a&bb)^(a&c)^(bb&c)))|0;
+      h=g; g=f; f=e; e=(d+t1)|0; d=c; c=bb; bb=a; a=(t1+t2)|0;
+    }
+    H[0]=(H[0]+a)|0; H[1]=(H[1]+bb)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+  }
+  const out=new Uint8Array(32); H.forEach((v,i)=>{ out[4*i]=v>>>24; out[4*i+1]=v>>>16; out[4*i+2]=v>>>8; out[4*i+3]=v; }); return out;
+}
+function utf8(s){ return new TextEncoder().encode(s); }
+function hmac(key,msg){
+  let k=utf8(key); if(k.length>64) k=sha256(k);
+  const ip=new Uint8Array(64+msg.length), op=new Uint8Array(96);
+  for(let i=0;i<64;i++){ const x=k[i]||0; ip[i]=x^0x36; op[i]=x^0x5c; }
+  ip.set(msg,64); op.set(sha256(ip),64); return sha256(op);
+}
+function khPass(code,kind,date){
+  const h=hmac(KH_SECRET, utf8(code.toUpperCase()+'|'+kind+(kind==='G'?'|'+date:'')));
+  const n=((h[0]<<24)|(h[1]<<16)|(h[2]<<8)|h[3])>>>0;
+  return String(n%1000000).padStart(6,'0');
+}
+function khToday(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+const $=i=>document.getElementById(i);
+$('date').value=khToday();
+function run(){
+  const c=$('code').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(c.length===0){ $('out').innerHTML=''; $('err').textContent=''; return; }
+  if(c.length!==6){ $('out').innerHTML=''; $('err').textContent='Kod 6 karakter olmalı.'; return; }
+  $('err').textContent='';
+  const d=$('date').value||khToday(), dd=d.split('-').reverse().join('.');
+  const s=khPass(c,'S'), g=khPass(c,'G',d);
+  $('out').innerHTML=`<div class="p s"><div><small>Sınırsız</small><b>${s}</b></div><button data-v="${s}">Kopyala</button></div>
+  <div class="p g"><div><small>1 günlük · ${dd}</small><b>${g}</b></div><button data-v="${g}">Kopyala</button></div>`;
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return;
+  navigator.clipboard.writeText(b.dataset.v).then(()=>{ b.textContent='Kopyalandı'; setTimeout(()=>b.textContent='Kopyala',1200); }).catch(()=>{}); });
+$('code').addEventListener('input',run); $('date').addEventListener('input',run); run();
+</script></body></html>

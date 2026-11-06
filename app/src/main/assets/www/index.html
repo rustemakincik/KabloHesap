@@ -69,11 +69,31 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
 .seg{display:flex;background:var(--chip);border-radius:10px;padding:3px;margin-top:12px}
 .seg button{flex:1;border:0;background:transparent;color:var(--muted);font-size:15px;font-weight:600;padding:9px;border-radius:8px}
 .seg button.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+#gate{display:none}
+body.locked #app{display:none}
+body.locked #gate{display:block}
+.gcode{font-size:34px;font-weight:700;letter-spacing:4px;text-align:center;margin:6px 0 10px;font-family:ui-monospace,monospace}
+.gin{width:100%;font-size:26px;font-weight:700;letter-spacing:6px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);outline:none}
+.gin:focus{border-color:var(--accent)}
 .foot{font-size:12px;color:var(--muted);margin:14px 4px;line-height:1.5}
 </style>
 </head>
-<body>
-<div class="wrap">
+<body class="locked">
+<div class="wrap" id="gate" style="max-width:420px;padding-top:40px">
+  <h1>Kablo Hesap</h1>
+  <div class="card">
+    <p id="gMsg" style="margin:0 0 12px;font-size:14px;color:var(--muted)">Uygulamayı açmak için bu kodu yetkiliye gönderin ve size verilen şifreyi girin.</p>
+    <label>Cihaz kodu</label>
+    <div class="gcode" id="gCode">------</div>
+    <button class="btn" id="gShare" style="width:100%;margin-bottom:16px">Kodu gönder</button>
+    <label>Şifre
+      <input class="gin" id="gPw" inputmode="numeric" maxlength="6" autocomplete="off" style="margin-top:5px">
+    </label>
+    <p class="err" id="gErr"></p>
+    <button class="btn pri" id="gOk" style="width:100%;margin-top:12px">Aç</button>
+  </div>
+</div>
+<div class="wrap" id="app">
   <h1>Kablo Hesap <small>IEC 60364-5-52</small></h1>
 
   <div class="card">
@@ -85,6 +105,10 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
       <label>Kablo metrajı
         <div class="field"><input id="l" inputmode="decimal" autocomplete="off" value="25"><span>m</span></div>
       </label>
+    </div>
+    <div class="seg" id="dt">
+      <button data-v="ap">Aydınlatma / Priz</button>
+      <button data-v="mo">Motor</button>
     </div>
     <div class="seg" id="mode">
       <button data-v="bina">Bina içi</button>
@@ -117,7 +141,17 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
       <label>Gruplanan devre
         <div class="field"><select id="g"></select></div>
       </label>
-      <label>Maks. gerilim düşümü
+      <label class="full">Tesis (gerilim düşümü sınırı)
+        <div class="field"><select id="ts">
+          <option value="seb">Şebekeden beslenen · yapı bağlantı kutusundan</option>
+          <option value="trf">Özel trafolu · trafo çıkışından</option>
+          <option value="elle">Elle sınır gir</option>
+        </select></div>
+      </label>
+      <label>Önceki hatlarda düşüm
+        <div class="field"><input id="pv" inputmode="decimal"><span>%</span></div>
+      </label>
+      <label id="eBox">Maks. gerilim düşümü
         <div class="field"><input id="e" inputmode="decimal"><span>%</span></div>
       </label>
       <label>cos φ
@@ -137,7 +171,7 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
   </details>
 
   <p class="foot">
-    Gerilim düşümü: Elektrik İç Tesisleri Yönetmeliği formülü — tek faz %e = 200·P·L / (k·S·U²), üç faz %e = 100·P·L / (k·S·U²); k bakır 56, alüminyum 35.
+    Gerilim düşümü: Elektrik İç Tesisleri Yönetmeliği formülü — tek faz %e = 200·P·L / (k·S·U²), üç faz %e = 100·P·L / (k·S·U²); k bakır 56, alüminyum 35 (yönetmelikteki gibi X=0). Sınır (md. 57): yapı bağlantı kutusundan tüketiciye aydınlatma-priz %1,5, motor %3; özel trafolu tesiste trafo çıkışından %6,5 / %8. Aydınlatma-priz linyelerinde en küçük kesit 2,5 mm².
     Akım taşıma: IEC 60364-5-52 PVC yalıtımlı (70°C) tablolar; bina içinde ortam sıcaklığı (30°C esas) ve gruplama, yeraltında toprak sıcaklığı (20°C esas), toprak ısıl direnci (2,5 K·m/W esas) ve gruplama katsayılarıyla düzeltilir. Sigorta: Ib ≤ In ≤ Iz.
     Kısa devre ve döngü empedansı kontrol edilmez. Sonuçlar ön boyutlandırmadır; proje için mühendis kontrolü gerekir.
   </p>
@@ -145,6 +179,86 @@ summary small{font-weight:400;color:var(--muted);font-size:12px;text-align:right
 
 <script>
 'use strict';
+/* ---------- Aktivasyon: kod → şifre (HMAC-SHA256) ---------- */
+const KH_SECRET='4c8439a8c486efead9d693313a64d14f41a665b3eef8fe35';
+function sha256(m){
+  const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const l=m.length, nb=((l+9+63)>>6)<<6, b=new Uint8Array(nb); b.set(m); b[l]=0x80;
+  const bits=l*8; b[nb-4]=bits>>>24; b[nb-3]=bits>>>16; b[nb-2]=bits>>>8; b[nb-1]=bits;
+  const w=new Uint32Array(64), r=(x,n)=>(x>>>n)|(x<<(32-n));
+  for(let o=0;o<nb;o+=64){
+    for(let i=0;i<16;i++) w[i]=(b[o+4*i]<<24)|(b[o+4*i+1]<<16)|(b[o+4*i+2]<<8)|b[o+4*i+3];
+    for(let i=16;i<64;i++){ const s0=r(w[i-15],7)^r(w[i-15],18)^(w[i-15]>>>3), s1=r(w[i-2],17)^r(w[i-2],19)^(w[i-2]>>>10); w[i]=(w[i-16]+s0+w[i-7]+s1)|0; }
+    let [a,bb,c,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){
+      const t1=(h+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+K[i]+w[i])|0;
+      const t2=((r(a,2)^r(a,13)^r(a,22))+((a&bb)^(a&c)^(bb&c)))|0;
+      h=g; g=f; f=e; e=(d+t1)|0; d=c; c=bb; bb=a; a=(t1+t2)|0;
+    }
+    H[0]=(H[0]+a)|0; H[1]=(H[1]+bb)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+  }
+  const out=new Uint8Array(32); H.forEach((v,i)=>{ out[4*i]=v>>>24; out[4*i+1]=v>>>16; out[4*i+2]=v>>>8; out[4*i+3]=v; }); return out;
+}
+function utf8(s){ return new TextEncoder().encode(s); }
+function hmac(key,msg){
+  let k=utf8(key); if(k.length>64) k=sha256(k);
+  const ip=new Uint8Array(64+msg.length), op=new Uint8Array(96);
+  for(let i=0;i<64;i++){ const x=k[i]||0; ip[i]=x^0x36; op[i]=x^0x5c; }
+  ip.set(msg,64); op.set(sha256(ip),64); return sha256(op);
+}
+function khPass(code,kind,date){
+  const h=hmac(KH_SECRET, utf8(code.toUpperCase()+'|'+kind+(kind==='G'?'|'+date:'')));
+  const n=((h[0]<<24)|(h[1]<<16)|(h[2]<<8)|h[3])>>>0;
+  return String(n%1000000).padStart(6,'0');
+}
+function khToday(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+let gMem={};
+function khCode(){
+  let c=lsGet('kh_code')||gMem.code;
+  if(!c){ const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r=new Uint8Array(6); crypto.getRandomValues(r);
+    c=Array.from(r,x=>A[x%A.length]).join(''); lsSet('kh_code',c); gMem.code=c; }
+  return c;
+}
+function khValid(){
+  let a=null; try{ a=JSON.parse(lsGet('kh_act')||'null'); }catch(e){}
+  a=a||gMem.act; if(!a) return {ok:false,why:''};
+  const t=khToday(), last=lsGet('kh_last')||'';
+  if(a.type==='S') return {ok:true};
+  if(last&&t<last) return {ok:false,why:'Telefon tarihi geriye alınmış. Yeni şifre gerekli.'};
+  if(a.type==='G'&&a.date===t) return {ok:true};
+  return {ok:false,why:'Günlük şifrenin süresi doldu. Bugün için yeni şifre girin.'};
+}
+function khCheck(){
+  const v=khValid(), t=khToday(), last=lsGet('kh_last')||'';
+  if(!last||t>last) lsSet('kh_last',t);
+  document.body.classList.toggle('locked',!v.ok);
+  if(!v.ok){ const c=khCode(); document.getElementById('gCode').textContent=c.slice(0,3)+' '+c.slice(3);
+    if(v.why) document.getElementById('gMsg').textContent=v.why+' Kodu yetkiliye gönderin.'; }
+  return v.ok;
+}
+function khTry(){
+  const pw=document.getElementById('gPw').value.replace(/\D/g,''), c=khCode(), t=khToday(), e=document.getElementById('gErr');
+  let a=null;
+  if(pw===khPass(c,'S')) a={type:'S'};
+  else if(pw===khPass(c,'G',t)) a={type:'G',date:t};
+  if(!a){ e.textContent='Şifre hatalı.'; return; }
+  e.textContent=''; lsSet('kh_act',JSON.stringify(a)); gMem.act=a; document.getElementById('gPw').value=''; khCheck();
+}
+document.getElementById('gOk').addEventListener('click',khTry);
+document.getElementById('gPw').addEventListener('keydown',ev=>{ if(ev.key==='Enter') khTry(); });
+document.getElementById('gPw').addEventListener('input',()=>{ document.getElementById('gErr').textContent=''; });
+document.getElementById('gShare').addEventListener('click',()=>{
+  const t='Kablo Hesap cihaz kodu: '+khCode();
+  if(window.Android&&Android.share) Android.share(t);
+  else if(navigator.clipboard) navigator.clipboard.writeText(khCode()).then(()=>{ document.getElementById('gShare').textContent='Kopyalandı'; }).catch(()=>{});
+});
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) khCheck(); });
+setInterval(khCheck,60000);
+khCheck();
 /* ---------- Tablolar (IEC 60364-5-52, PVC, 70°C iletken, 30°C ortam) ---------- */
 const CU_S=[1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240];
 const AL_S=[16,25,35,50,70,95,120,150,185,240];
@@ -192,7 +306,9 @@ const KR={D1:{0.5:1.28,0.7:1.20,1:1.18,1.5:1.10,2:1.05,2.5:1.00,3:0.96},
 const KGG={D1:{1:1,2:0.85,3:0.75,4:0.70,5:0.65,6:0.60},
            D2:{1:1,2:0.75,3:0.65,4:0.60,5:0.55,6:0.50}};
 const BRK=[6,10,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400];
-const DEF={mode:'bina',unit:'kW',e:3,c:0.9,u1:230,u3:400,
+/* Elektrik İç Tesisleri Yönetmeliği md. 57: toplam düşüm sınırı (aydınlatma-priz / motor) */
+const LIM={seb:{ap:1.5,mo:3}, trf:{ap:6.5,mo:8}};
+const DEF={mode:'bina',unit:'kW',dt:'ap',ts:'seb',pv:0,e:3,c:0.9,u1:230,u3:400,
   bina:{m:'B2',t:30,g:1}, yer:{m:'D1',t:20,g:1,r:2.5}};
 
 /* ---------- Hesap motoru ---------- */
@@ -210,11 +326,13 @@ function calc(o){ /* o: {P(W), L(m), tri, al, m, t, g, e, c, u1, u3} */
   const kt=(D?KTG:KT)[o.t]||1, kg=(D?KGG[o.m]:KG)[o.g]||1, kr=D?(KR[o.m][o.r]||1):1;
   const sizes=o.al?AL_S:CU_S, tab=IZ[o.al?'al':'cu'][o.tri?3:2][o.m];
   const In=BRK.find(b=>b>=Ib-1e-9);
+  const minS=o.minS||0;
   const rows=sizes.map((S,i)=>{
     const Iz=tab[i]*kt*kg*kr;
     const e=(o.tri?100:200)*o.P*o.L/(k*S*U*U);
     let why='';
-    if(Iz<Ib) why='Akım yetersiz';
+    if(S<minS) why='Yönetmelik min.';
+    else if(Iz<Ib) why='Akım yetersiz';
     else if(!In||In>Iz) why='Sigorta uymuyor';
     else if(e>o.e) why='Düşüm fazla';
     return {S,Iz,e,In,ok:!why,why};
@@ -259,11 +377,14 @@ function toUI(){
   const c=cur(); fillSelects();
   $('p').value=st.p; $('l').value=st.l; $('m').value=c.m; $('t').value=String(c.t); $('g').value=String(c.g);
   if(c.r!=null) $('r').value=String(c.r);
+  $('ts').value=st.ts; $('pv').value=fs(st.pv); $('eBox').style.display=st.ts==='elle'?'':'none';
+  document.querySelectorAll('#dt button').forEach(b=>b.classList.toggle('on',b.dataset.v===st.dt));
   $('e').value=fs(st.e); $('c').value=fs(st.c); $('u1').value=st.u1; $('u3').value=st.u3;
 }
 function readAdv(){
   const e=num($('e').value), c=num($('c').value), u1=num($('u1').value), u3=num($('u3').value), k=cur();
   k.m=$('m').value; k.t=+$('t').value; k.g=+$('g').value; if(st.mode==='yer') k.r=+$('r').value;
+  const pv=num($('pv').value); st.ts=$('ts').value; st.pv=pv>=0?pv:0;
   if(e>0&&e<=20) st.e=e; if(c>0&&c<=1) st.c=c; if(u1>=100) st.u1=u1; if(u3>=100) st.u3=u3;
 }
 
@@ -305,21 +426,25 @@ function run(){
   st.p=$('p').value; st.l=$('l').value; st.unit=$('u').value; readAdv(); save();
   const k=cur(), amp=st.unit==='A', v=num(st.p), L=num(st.l);
   $('pLbl').textContent=amp?'Akım':'Güç';
-  $('advSum').textContent=`${k.m} · ${k.t}°C · ${k.g} devre${st.mode==='yer'?' · '+fs(k.r)+' K·m/W':''} · %${fs(st.e)} · cos φ ${fs(st.c)}`;
+  const tot=st.ts==='elle'?st.e:LIM[st.ts][st.dt], allow=tot-(st.ts==='elle'?0:st.pv);
+  $('advSum').textContent=`${k.m} · ${k.t}°C · ${k.g} devre${st.mode==='yer'?' · '+fs(k.r)+' K·m/W':''} · sınır %${fmt(allow,2)} · cos φ ${fs(st.c)}`;
   if(!(v>0)||!(L>0)){ $('err').textContent=(amp?'Akım':'Güç')+' ve metraj sıfırdan büyük olmalı.'; $('out').innerHTML=''; last=null; return; }
+  if(!(allow>0)){ $('err').textContent=`Önceki hatlardaki düşüm (%${fs(st.pv)}) sınırı (%${fs(tot)}) dolduruyor. Bu hat için pay kalmadı.`; $('out').innerHTML=''; last=null; return; }
   $('err').textContent='';
-  const base={P:amp?0:v*1000,I:amp?v:0,L,m:k.m,t:k.t,g:k.g,r:k.r,e:st.e,c:st.c,u1:st.u1,u3:st.u3,under:st.mode==='yer'};
+  const minS=st.dt==='ap'?2.5:0;
+  const base={P:amp?0:v*1000,I:amp?v:0,L,m:k.m,t:k.t,g:k.g,r:k.r,e:allow,minS,c:st.c,u1:st.u1,u3:st.u3,under:st.mode==='yer'};
   const a=card('1c','Tek faz · Bakır',false,false,base), b=card('3c','Üç faz · Bakır',true,false,base),
         c=card('1a','Tek faz · Alüminyum',false,true,base), d=card('3a','Üç faz · Alüminyum',true,true,base);
+  const lim=`<div class="note" style="margin:0 0 12px;background:var(--accent-soft);color:var(--accent)">${st.ts==='elle'?'Elle girilen sınır':(st.dt==='ap'?'Aydınlatma / priz':'Motor')+' devresi · '+(st.ts==='seb'?'yapı bağlantı kutusundan':'trafo çıkışından')+' toplam %'+fs(tot)}${st.ts!=='elle'&&st.pv>0?' − önceki %'+fs(st.pv):''} → bu hat için izin verilen düşüm <b>%${fmt(allow,2)}</b>${minS?' · en küçük kesit 2,5 mm² (linye)':''}</div>`;
   const yn=base.under?`<div class="note" style="margin:0 0 12px">Yeraltında NYM kullanılmaz; bakırda NYY, alüminyumda NAYY verilir. Kum yatağı ve koruma tuğlası/bant unutulmasın.</div>`:'';
-  $('out').innerHTML=`${yn}<div class="grp">BAKIR</div>${a.h}${b.h}<div class="grp">ALÜMİNYUM</div>${c.h}${d.h}`;
-  last={under:base.under,list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
+  $('out').innerHTML=`${lim}${yn}<div class="grp">BAKIR</div>${a.h}${b.h}<div class="grp">ALÜMİNYUM</div>${c.h}${d.h}`;
+  last={under:base.under,allow,dev:st.dt==='ap'?'aydınlatma/priz':'motor',list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
 }
 
 function shareText(){
   if(!last) return '';
   const k=cur();
-  let t=`Kablo kesit hesabı (${last.under?'yeraltı':'bina içi'})\n${st.unit==='A'?'Akım':'Güç'}: ${fs(st.p)} ${st.unit==='A'?'A':'kW'} · Metraj: ${fs(st.l)} m\nMontaj ${k.m}, ${k.t}°C, ${k.g} devre${last.under?', '+fs(k.r)+' K·m/W':''}, maks. %${fs(st.e)}\n\n`;
+  let t=`Kablo kesit hesabı (${last.under?'yeraltı':'bina içi'})\n${st.unit==='A'?'Akım':'Güç'}: ${fs(st.p)} ${st.unit==='A'?'A':'kW'} · Metraj: ${fs(st.l)} m\nMontaj ${k.m}, ${k.t}°C, ${k.g} devre${last.under?', '+fs(k.r)+' K·m/W':''}, ${last.dev}, izin verilen %${fmt(last.allow,2)}\n\n`;
   last.list.forEach(([n,x,tri,al])=>{
     t+= x.best ? `${n}: ${cableName(x.best.S,tri,al,last.under)} mm² · ${fmt(x.r.Ib,1)} A · %e ${fmt(x.best.e,2)} · sigorta ${x.best.In} A\n` : `${n}: uygun kesit yok\n`;
   });
@@ -329,12 +454,14 @@ function shareText(){
 document.addEventListener('click',ev=>{
   const b=ev.target.closest('.more'); if(b){ const k=b.dataset.k; open[k]=!open[k]; run(); }
 });
-['p','l','e','c','u1','u3'].forEach(id=>$(id).addEventListener('input',run));
+['p','l','e','c','u1','u3','pv'].forEach(id=>$(id).addEventListener('input',run));
 ['t','g','r','u'].forEach(id=>$(id).addEventListener('change',run));
+$('ts').addEventListener('change',()=>{ readAdv(); toUI(); run(); });
+document.querySelectorAll('#dt button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.dt=b.dataset.v; toUI(); run(); }));
 $('m').addEventListener('change',()=>{ readAdv(); toUI(); run(); });
 document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.mode=b.dataset.v; toUI(); run(); }));
 document.querySelectorAll('#dm button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.yer.m=b.dataset.v; toUI(); run(); }));
-$('reset').addEventListener('click',()=>{ const keep={p:st.p,l:st.l,unit:st.unit,mode:st.mode}; Object.assign(st,clone(DEF),keep); toUI(); run(); });
+$('reset').addEventListener('click',()=>{ const keep={p:st.p,l:st.l,unit:st.unit,mode:st.mode,dt:st.dt}; Object.assign(st,clone(DEF),keep); toUI(); run(); });
 $('share').addEventListener('click',()=>{
   const t=shareText(); if(!t) return;
   if(window.Android&&Android.share) Android.share(t);
