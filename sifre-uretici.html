@@ -19,11 +19,10 @@ button{border:0;background:transparent;color:inherit;font-weight:600;font-size:1
 <h1>Kablo Hesap · şifre üretici</h1>
 <div class="c">
 <label>Cihaz kodu<input id="code" maxlength="7" autocomplete="off" placeholder="ABC 234"></label>
-<label>Günlük şifrenin geçerli olacağı gün<input id="date" type="date"></label>
 <p class="err" id="err"></p>
 <div id="out"></div>
 </div>
-<p style="font-size:12px;color:var(--muted);margin:0 4px">Günlük şifre yalnızca seçilen gün geçerlidir; ertesi gün aynı kod için yeni günlük şifre üretin. Sınırsız şifre o cihaz kodunda süresiz açar. Uygulama silinip yüklenirse kod değişir.</p>
+<p style="font-size:12px;color:var(--muted);margin:0 4px">Günlük şifre yalnızca bugün geçerlidir; ertesi gün aynı kod için yeni günlük şifre üretin. Sınırsız şifre o cihaz kodunda süresiz açar. Uygulama silinip yüklenirse kod değişir.</p>
 </div>
 <script>
 /* ---------- Aktivasyon: kod → şifre (HMAC-SHA256) ---------- */
@@ -62,18 +61,17 @@ function khPass(code,kind,date){
 function khToday(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 const $=i=>document.getElementById(i);
-$('date').value=khToday();
 function run(){
   const c=$('code').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(c.length===0){ $('out').innerHTML=''; $('err').textContent=''; return; }
   if(c.length!==6){ $('out').innerHTML=''; $('err').textContent='Kod 6 karakter olmalı.'; return; }
   $('err').textContent='';
-  const d=$('date').value||khToday(), dd=d.split('-').reverse().join('.');
+  const d=khToday(), dd=d.split('-').reverse().join('.');
   const s=khPass(c,'S'), g=khPass(c,'G',d);
   $('out').innerHTML=`<div class="p s"><div><small>Sınırsız</small><b>${s}</b></div><button data-v="${s}">Kopyala</button></div>
-  <div class="p g"><div><small>1 günlük · ${dd}</small><b>${g}</b></div><button data-v="${g}">Kopyala</button></div>`;
+  <div class="p g"><div><small>1 günlük · bugün ${dd}</small><b>${g}</b></div><button data-v="${g}">Kopyala</button></div>`;
 }
 document.addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return;
   navigator.clipboard.writeText(b.dataset.v).then(()=>{ b.textContent='Kopyalandı'; setTimeout(()=>b.textContent='Kopyala',1200); }).catch(()=>{}); });
-$('code').addEventListener('input',run); $('date').addEventListener('input',run); run();
+$('code').addEventListener('input',run); run();
 </script></body></html>

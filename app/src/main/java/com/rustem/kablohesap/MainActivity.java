@@ -1,8 +1,11 @@
 package com.rustem.kablohesap;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.pdf.PdfDocument;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -13,15 +16,26 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+
+import java.io.File;
+import java.io.FileOutputStream;
 
 public class MainActivity extends Activity {
+    private static final int PDF_W = 794;   // A4 genişliği, CSS px
+    private static final int PDF_H = 1123;  // A4 yüksekliği, CSS px
     private WebView web;
+    private FrameLayout root;
+    private boolean pdfBusy = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WebView.enableSlowWholeDocumentDraw();
+        root = new FrameLayout(this);
         web = new WebView(this);
-        setContentView(web);
+        root.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(root);
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -78,6 +92,70 @@ public class MainActivity extends Activity {
         w.getDecorView().setSystemUiVisibility(flags);
     }
 
+    /* Tek sayfalık A4 PDF: HTML ekran dışı bir WebView'da çizilir, PdfDocument'e aktarılır, paylaşılır. */
+    private void makePdf(final String html, final String fileName) {
+        if (pdfBusy) return;
+        pdfBusy = true;
+        final float d = getResources().getDisplayMetrics().density;
+        final int wPx = Math.round(PDF_W * d);
+        final int hPx = Math.round(PDF_H * d);
+        final WebView pw = new WebView(this);
+        pw.getSettings().setJavaScriptEnabled(false);
+        pw.getSettings().setTextZoom(100);
+        pw.setBackgroundColor(Color.WHITE);
+        pw.setVerticalScrollBarEnabled(false);
+        pw.setHorizontalScrollBarEnabled(false);
+        root.addView(pw, 0, new FrameLayout.LayoutParams(wPx, hPx));
+        pw.setWebViewClient(new WebViewClient() {
+            boolean started = false;
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                if (started) return;
+                started = true;
+                v.postDelayed(() -> finishPdf(pw, wPx, hPx, fileName), 700);
+            }
+        });
+        pw.loadDataWithBaseURL("file:///android_asset/www/", html, "text/html", "utf-8", null);
+    }
+
+    private void finishPdf(WebView pw, int wPx, int hPx, String fileName) {
+        boolean ok = false;
+        PdfDocument doc = new PdfDocument();
+        try {
+            PdfDocument.Page page = doc.startPage(new PdfDocument.PageInfo.Builder(595, 842, 1).create());
+            Canvas c = page.getCanvas();
+            float s = 595f / wPx;
+            c.scale(s, s);
+            c.clipRect(0, 0, wPx, hPx);
+            pw.draw(c);
+            doc.finishPage(page);
+            File dir = new File(getCacheDir(), "pdf");
+            if (!dir.exists()) dir.mkdirs();
+            File[] old = dir.listFiles();
+            if (old != null) for (File f : old) f.delete();
+            String safe = fileName == null ? "Kablo-Hesap.pdf" : fileName.replaceAll("[^\\p{L}\\p{N}_.-]+", "-");
+            if (!safe.toLowerCase().endsWith(".pdf")) safe += ".pdf";
+            File out = new File(dir, safe);
+            try (FileOutputStream fo = new FileOutputStream(out)) { doc.writeTo(fo); }
+            ok = true;
+            Uri uri = new Uri.Builder().scheme("content").authority(getPackageName() + ".pdf").appendPath(out.getName()).build();
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType("application/pdf");
+            i.putExtra(Intent.EXTRA_STREAM, uri);
+            i.setClipData(ClipData.newRawUri("", uri));
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(i, "Raporu paylaş"));
+        } catch (Exception e) {
+            ok = false;
+        } finally {
+            doc.close();
+            root.removeView(pw);
+            pw.destroy();
+            pdfBusy = false;
+            web.evaluateJavascript("window.pdfDone && window.pdfDone(" + ok + ")", null);
+        }
+    }
+
     private class Bridge {
         @JavascriptInterface
         public void share(String text) {
@@ -85,8 +163,13 @@ public class MainActivity extends Activity {
                 Intent i = new Intent(Intent.ACTION_SEND);
                 i.setType("text/plain");
                 i.putExtra(Intent.EXTRA_TEXT, text);
-                startActivity(Intent.createChooser(i, "Sonucu paylaş"));
+                startActivity(Intent.createChooser(i, "Paylaş"));
             });
+        }
+
+        @JavascriptInterface
+        public void sharePdf(String html, String fileName) {
+            runOnUiThread(() -> makePdf(html, fileName));
         }
     }
 }

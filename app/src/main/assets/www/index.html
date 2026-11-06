@@ -125,6 +125,7 @@ body.locked #gate{display:block}
   </div>
 
   <div id="out"></div>
+  <button class="btn pri" id="share" style="width:100%;padding:13px;font-size:15px;margin-bottom:12px">PDF olarak paylaş</button>
 
   <details id="advBox">
     <summary>Gelişmiş ayarlar <small id="advSum"></small></summary>
@@ -165,7 +166,6 @@ body.locked #gate{display:block}
       </label>
       <div class="full row">
         <button class="btn" id="reset">Varsayılana dön</button>
-        <button class="btn pri" id="share">Sonucu paylaş</button>
       </div>
     </div>
   </details>
@@ -438,8 +438,72 @@ function run(){
   const lim=`<div class="note" style="margin:0 0 12px;background:var(--accent-soft);color:var(--accent)">${st.ts==='elle'?'Elle girilen sınır':(st.dt==='ap'?'Aydınlatma / priz':'Motor')+' devresi · '+(st.ts==='seb'?'yapı bağlantı kutusundan':'trafo çıkışından')+' toplam %'+fs(tot)}${st.ts!=='elle'&&st.pv>0?' − önceki %'+fs(st.pv):''} → bu hat için izin verilen düşüm <b>%${fmt(allow,2)}</b>${minS?' · en küçük kesit 2,5 mm² (linye)':''}</div>`;
   const yn=base.under?`<div class="note" style="margin:0 0 12px">Yeraltında NYM kullanılmaz; bakırda NYY, alüminyumda NAYY verilir. Kum yatağı ve koruma tuğlası/bant unutulmasın.</div>`:'';
   $('out').innerHTML=`${lim}${yn}<div class="grp">BAKIR</div>${a.h}${b.h}<div class="grp">ALÜMİNYUM</div>${c.h}${d.h}`;
-  last={under:base.under,allow,dev:st.dt==='ap'?'aydınlatma/priz':'motor',list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
+  last={base,tot,under:base.under,allow,dev:st.dt==='ap'?'aydınlatma/priz':'motor',list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
 }
+
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function reportHtml(){
+  const k=cur(), b=last.base, y=last.under, now=new Date();
+  const dstr=now.toLocaleDateString('tr-TR')+' '+now.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+  const mon=((y?MYER:MBINA).find(x=>x[0]===k.m)||['',k.m])[1];
+  const amp=st.unit==='A';
+  const inp=[
+    [amp?'Yük akımı':'Yük gücü', fs(st.p)+(amp?' A':' kW')],
+    ['Kablo metrajı', fs(st.l)+' m'],
+    ['Devre tipi', st.dt==='ap'?'Aydınlatma / priz':'Motor'],
+    ['Döşeme', (y?'Yeraltı':'Bina içi')],
+    ['Montaj yöntemi', mon],
+    [y?'Toprak sıcaklığı':'Ortam sıcaklığı', k.t+' °C'],
+    ['Gruplanan devre', String(k.g)],
+    y?['Toprak ısıl direnci', fs(k.r)+' K·m/W']:null,
+    ['cos φ', fs(st.c)],
+    ['Gerilim', st.u1+' V (tek faz) · '+st.u3+' V (üç faz)'],
+    ['Gerilim düşümü sınırı', st.ts==='elle'?'%'+fs(st.e)+' (elle)':'%'+fs(last.tot)+' toplam'+(st.pv>0?' − önceki %'+fs(st.pv):'')+' → bu hat %'+fmt(last.allow,2)]
+  ].filter(Boolean);
+  const cardsH=last.list.map(([n,x,tri,al])=>{
+    if(!x.best) return `<div class="rc"><div class="rt">${n}</div><div class="rk no">Uygun kesit yok</div><div class="rs">Akım ${fmt(x.r.Ib,1)} A</div></div>`;
+    const bb=x.best, alt=x.r.ok.slice(1,3).map(a=>fs(a.S)+' mm² (%'+fmt(a.e,2)+')').join(', ');
+    return `<div class="rc"><div class="rt">${n} · ${tri?st.u3:st.u1} V</div><div class="rk">${cableName(bb.S,tri,al,y)} mm²</div>
+      <table class="rd"><tr><td>Akım</td><td>${fmt(x.r.Ib,1)} A</td><td>Kapasite</td><td>${fmt(bb.Iz,0)} A</td></tr>
+      <tr><td>Gerilim düşümü</td><td>%${fmt(bb.e,2)}</td><td>Doluluk</td><td>%${fmt(x.r.Ib/bb.Iz*100,0)}</td></tr>
+      <tr><td>Sigorta</td><td>${bb.In<=63?'C':'TMŞ '}${bb.In} A</td><td>Kaçak akım</td><td>${bb.In<=63?'30 mA':'300 mA'}</td></tr></table>
+      ${alt?`<div class="ra">Olabilir: ${alt}</div>`:''}</div>`;
+  }).join('');
+  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><style>
+  *{box-sizing:border-box}html,body{margin:0;width:794px;height:1123px;background:#fff;color:#1B222B;font:13px/1.4 system-ui,-apple-system,Roboto,"Segoe UI",sans-serif}
+  .pg{padding:44px 48px;height:1123px;position:relative}
+  .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1E5FA8;padding-bottom:10px;margin-bottom:18px}
+  .hd h1{margin:0;font-size:24px;color:#1E5FA8}.hd div{font-size:12px;color:#5E6875;text-align:right}
+  h2{font-size:13px;letter-spacing:.6px;color:#5E6875;margin:18px 0 8px;text-transform:uppercase}
+  .in{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+  .in div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #E6EAF0;padding:5px 0}
+  .in span{color:#5E6875}.in b{text-align:right;font-weight:600}
+  .in .w{grid-column:1/-1}
+  .gr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .rc{border:1px solid #DDE3EA;border-radius:10px;padding:12px 14px}
+  .rt{font-size:12px;color:#5E6875;font-weight:600}
+  .rk{font-size:22px;font-weight:700;margin:4px 0 8px;color:#1B222B}.rk.no{color:#A3302D;font-size:18px}
+  .rd{width:100%;border-collapse:collapse;font-size:12px}.rd td{padding:3px 0;border-bottom:1px solid #EEF1F5}
+  .rd td:nth-child(odd){color:#5E6875}.rd td:nth-child(even){text-align:right;font-weight:600;padding-right:8px}
+  .rd td:nth-child(3){padding-left:10px}
+  .ra{font-size:11.5px;color:#1F6B4F;margin-top:7px}
+  .nt{background:#FDF1E2;color:#9A4508;border-radius:8px;padding:8px 10px;font-size:12px;margin-top:12px}
+  .ft{position:absolute;left:48px;right:48px;bottom:36px;font-size:10.5px;color:#5E6875;border-top:1px solid #E6EAF0;padding-top:8px;line-height:1.5}
+  </style></head><body><div class="pg">
+  <div class="hd"><h1>Kablo Kesit Hesap Raporu</h1><div>${esc(dstr)}<br>Kablo Hesap</div></div>
+  <h2>Girdiler</h2>
+  <div class="in">${inp.map((r,i)=>`<div class="${r[0]==='Montaj yöntemi'||r[0]==='Gerilim düşümü sınırı'||r[0]==='Gerilim'?'w':''}"><span>${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('')}</div>
+  <h2>Sonuçlar</h2>
+  <div class="gr">${cardsH}</div>
+  ${y?'<div class="nt">Yeraltında NYM kullanılmaz; bakırda NYY, alüminyumda NAYY verilmiştir. Kum yatağı ve koruma tuğlası/bandı uygulanmalıdır.</div>':''}
+  ${!y&&st.dt==='ap'?'<div class="nt">Aydınlatma ve priz linyelerinde en küçük kesit 2,5 mm² alınmıştır.</div>':''}
+  <div class="ft">Gerilim düşümü Elektrik İç Tesisleri Yönetmeliği formülüyle hesaplanmıştır: tek faz %e = 200·P·L/(k·S·U²), üç faz %e = 100·P·L/(k·S·U²); k bakır 56, alüminyum 35, reaktans ihmal (X=0). Sınır md. 57: yapı bağlantı kutusundan tüketiciye aydınlatma-priz %1,5, motor %3 (özel trafolu tesiste trafo çıkışından %6,5 / %8).
+  Akım taşıma kapasitesi IEC 60364-5-52 PVC yalıtımlı (70 °C) tablolardan alınmış, sıcaklık${y?', toprak ısıl direnci':''} ve gruplama katsayılarıyla düzeltilmiştir. Sigorta seçimi Ib ≤ In ≤ Iz koşuluna göredir. Kısa devre ve döngü empedansı kontrolü bu rapora dahil değildir. Sonuçlar ön boyutlandırma niteliğindedir; uygulama projesinde mühendis kontrolü gerekir.</div>
+  </div></body></html>`;
+}
+function pdfName(){ const n=new Date(); return 'Kablo-Hesap-'+fs(st.p)+(st.unit==='A'?'A':'kW')+'-'+fs(st.l)+'m-'+n.getFullYear()+String(n.getMonth()+1).padStart(2,'0')+String(n.getDate()).padStart(2,'0')+'.pdf'; }
+window.pdfDone=function(ok){ $('share').textContent=ok?'PDF olarak paylaş':'PDF oluşturulamadı, tekrar deneyin'; };
 
 function shareText(){
   if(!last) return '';
@@ -463,10 +527,10 @@ document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',
 document.querySelectorAll('#dm button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.yer.m=b.dataset.v; toUI(); run(); }));
 $('reset').addEventListener('click',()=>{ const keep={p:st.p,l:st.l,unit:st.unit,mode:st.mode,dt:st.dt}; Object.assign(st,clone(DEF),keep); toUI(); run(); });
 $('share').addEventListener('click',()=>{
-  const t=shareText(); if(!t) return;
-  if(window.Android&&Android.share) Android.share(t);
-  else if(navigator.share) navigator.share({text:t}).catch(()=>{});
-  else if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>{ $('share').textContent='Kopyalandı'; setTimeout(()=>$('share').textContent='Sonucu paylaş',1500); });
+  if(!last) return;
+  if(window.Android&&Android.sharePdf){ $('share').textContent='PDF hazırlanıyor…'; Android.sharePdf(reportHtml(),pdfName()); return; }
+  const t=shareText();
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>{ $('share').textContent='PDF uygulamada; sonuç metni kopyalandı'; setTimeout(()=>$('share').textContent='PDF olarak paylaş',1800); }).catch(()=>{});
 });
 window.appBack=function(){ const d=$('advBox'); if(d.open){ d.open=false; return true; } return false; };
 $('p').addEventListener('focus',e=>e.target.select()); $('l').addEventListener('focus',e=>e.target.select());
