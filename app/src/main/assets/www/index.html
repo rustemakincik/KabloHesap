@@ -113,6 +113,7 @@ body.locked #gate{display:block}
     <div class="seg" id="mode">
       <button data-v="bina">Bina içi</button>
       <button data-v="yer">Yeraltı</button>
+      <button data-v="hav">Havai / Açıkta</button>
     </div>
     <div id="dBox">
       <p style="font-size:13px;color:var(--muted);margin:12px 2px 0">Kablo nasıl döşenecek?</p>
@@ -270,14 +271,16 @@ const IZ={
        B2:[16.5,23,30,38,52,69,90,111,133,168,201,232,258,294,344],
        C:[19.5,27,36,46,63,85,112,138,168,213,258,299,344,392,461],
        D1:[22,29,37,46,60,78,99,119,140,173,204,231,261,292,336],
-       D2:[22,28,38,48,64,83,110,132,156,192,230,261,293,331,382]},
+       D2:[22,28,38,48,64,83,110,132,156,192,230,261,293,331,382],
+       E:[22,30,40,51,70,94,119,148,180,232,282,328,379,434,514]},
     3:{A1:[13.5,18,24,31,42,56,73,89,108,136,164,188,216,245,286],
        A2:[13,17.5,23,29,39,52,68,83,99,125,150,172,196,223,261],
        B1:[15.5,21,28,36,50,68,89,110,134,171,207,239,262,296,346],
        B2:[15,20,27,34,46,62,80,99,118,149,179,206,225,255,297],
        C:[17.5,24,32,41,57,76,96,119,144,184,223,259,299,341,403],
        D1:[18,24,30,38,50,64,82,98,116,143,169,192,217,243,280],
-       D2:[19,24,33,41,54,70,92,110,130,162,193,220,246,278,320]}
+       D2:[19,24,33,41,54,70,92,110,130,162,193,220,246,278,320],
+       E:[18.5,25,34,43,60,80,101,126,153,196,238,276,319,364,430]}
   },
   al:{
     2:{A1:[48,63,77,93,118,142,164,189,215,252],
@@ -286,14 +289,16 @@ const IZ={
        B2:[53,71,86,104,131,157,181,201,230,269],
        C:[66,83,103,125,160,195,226,261,298,352],
        D1:[62,80,96,113,140,166,189,213,240,277],
-       D2:[64,85,102,121,150,179,204,229,258,297]},
+       D2:[64,85,102,121,150,179,204,229,258,297],
+       E:[73,89,111,135,173,210,244,282,322,380]},
     3:{A1:[44,58,71,86,108,130,150,172,195,229],
        A2:[41,53,65,78,98,118,135,155,176,207],
        B1:[53,70,86,104,133,161,186,204,230,269],
        B2:[48,62,77,92,116,139,160,176,199,232],
        C:[59,73,90,110,140,170,197,227,259,305],
        D1:[52,67,80,94,117,138,157,178,200,230],
-       D2:[54,71,85,101,125,150,171,193,217,250]}
+       D2:[54,71,85,101,125,150,171,193,217,250],
+       E:[61,78,96,117,150,183,212,245,280,330]}
   }
 };
 /* Havada: ortam sıcaklığı (30°C esas), gruplama (demet / yüzeyde) */
@@ -303,13 +308,15 @@ const KG={1:1,2:0.80,3:0.70,4:0.65,5:0.60,6:0.57,7:0.54,8:0.52,9:0.50,12:0.45,16
 const KTG={10:1.10,15:1.05,20:1.00,25:0.95,30:0.89,35:0.84,40:0.77};
 const KR={D1:{0.5:1.28,0.7:1.20,1:1.18,1.5:1.10,2:1.05,2.5:1.00,3:0.96},
           D2:{0.5:1.88,0.7:1.62,1:1.50,1.5:1.28,2:1.12,2.5:1.00,3:0.90}};
+/* Havada / tavada çok damarlı kablolar, tek sıra (delikli tava) */
+const KGE={1:1,2:0.88,3:0.82,4:0.79,6:0.76,9:0.73};
 const KGG={D1:{1:1,2:0.85,3:0.75,4:0.70,5:0.65,6:0.60},
            D2:{1:1,2:0.75,3:0.65,4:0.60,5:0.55,6:0.50}};
 const BRK=[6,10,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400];
 /* Elektrik İç Tesisleri Yönetmeliği md. 57: toplam düşüm sınırı (aydınlatma-priz / motor) */
 const LIM={seb:{ap:1.5,mo:3}, trf:{ap:6.5,mo:8}};
 const DEF={mode:'bina',unit:'kW',dt:'ap',ts:'seb',pv:0,e:3,c:0.9,u1:230,u3:400,
-  bina:{m:'B2',t:30,g:1}, yer:{m:'D1',t:20,g:1,r:2.5}};
+  bina:{m:'B2',t:30,g:1}, yer:{m:'D1',t:20,g:1,r:2.5}, hav:{m:'E1',t:30,g:1}};
 
 /* ---------- Hesap motoru ---------- */
 function num(v){ if(v==null) return NaN; return parseFloat(String(v).replace(/\s/g,'').replace(',','.')); }
@@ -323,8 +330,9 @@ function calc(o){ /* o: {P(W), L(m), tri, al, m, t, g, e, c, u1, u3} */
   else { P=o.P; Ib=o.tri? P/(Math.sqrt(3)*U*o.c) : P/(U*o.c); }
   o=Object.assign({},o,{P});
   const D=o.m==='D1'||o.m==='D2';
-  const kt=(D?KTG:KT)[o.t]||1, kg=(D?KGG[o.m]:KG)[o.g]||1, kr=D?(KR[o.m][o.r]||1):1;
-  const sizes=o.al?AL_S:CU_S, tab=IZ[o.al?'al':'cu'][o.tri?3:2][o.m];
+  const E=o.m==='E1'||o.m==='E2';
+  const kt=(D?KTG:KT)[o.t]||1, kg=(D?KGG[o.m]:E?KGE:KG)[o.g]||1, kr=D?(KR[o.m][o.r]||1):1;
+  const sizes=o.al?AL_S:CU_S, tab=IZ[o.al?'al':'cu'][o.tri?3:2][E?'E':o.m];
   const In=BRK.find(b=>b>=Ib-1e-9);
   const minS=o.minS||0;
   const rows=sizes.map((S,i)=>{
@@ -353,25 +361,28 @@ const st=Object.assign(clone(DEF),{p:'5',l:'25'});
 const open={};
 const MBINA=[['A1','A1 · Isı yalıtımlı duvarda boru içinde iletken'],['A2','A2 · Isı yalıtımlı duvarda boru içinde kablo'],
   ['B1','B1 · Duvarda / sıva altı boru içinde iletken'],['B2','B2 · Duvarda / sıva altı boru içinde kablo'],['C','C · Duvara doğrudan kelepçeli kablo']];
+const MHAV=[['E1','E · Serbest havada / askı teline asılı kablo'],['E2','E · Delikli kablo tavası üzerinde kablo']];
 const MYER=[['D1','D1 · Toprakta boru (künk) içinde kablo'],['D2','D2 · Doğrudan toprağa gömülü kablo']];
 const sortK=o=>Object.keys(o).sort((a,b)=>a-b);
 function load(){ try{ const s=JSON.parse(localStorage.getItem('kablohesap')||'null');
-  if(s&&s.bina&&s.yer){ Object.assign(st,s); st.bina=Object.assign(clone(DEF.bina),s.bina); st.yer=Object.assign(clone(DEF.yer),s.yer); } }catch(e){} }
+  if(s&&s.bina&&s.yer){ Object.assign(st,s); st.bina=Object.assign(clone(DEF.bina),s.bina); st.yer=Object.assign(clone(DEF.yer),s.yer); st.hav=Object.assign(clone(DEF.hav),s.hav||{}); } }catch(e){} }
 function save(){ try{ localStorage.setItem('kablohesap',JSON.stringify(st)); }catch(e){} }
 const cur=()=>st[st.mode];
 
 function fillSelects(){
-  const y=st.mode==='yer', c=cur();
-  $('m').innerHTML=(y?MYER:MBINA).map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+  const y=st.mode==='yer', hv=st.mode==='hav', c=cur();
+  const MS=y?MYER:hv?MHAV:MBINA, GS=y?KGG[c.m]:hv?KGE:KG;
+  $('m').innerHTML=MS.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
   $('t').innerHTML=sortK(y?KTG:KT).map(t=>`<option value="${t}">${t} °C</option>`).join('');
-  $('g').innerHTML=sortK(y?KGG[c.m]:KG).map(g=>`<option value="${g}">${g}${g==='1'?' (tek devre)':' devre'}</option>`).join('');
+  $('g').innerHTML=sortK(GS).map(g=>`<option value="${g}">${g}${g==='1'?' (tek devre)':' devre'}</option>`).join('');
   $('r').innerHTML=sortK(KR.D1).map(r=>`<option value="${r}">${fs(r)} K·m/W${r==='1'?' (nemli)':r==='2.5'?' (kuru, güvenli)':''}</option>`).join('');
   $('tLbl').textContent=y?'Toprak sıcaklığı':'Ortam sıcaklığı';
   $('rBox').style.display=y?'':'none';
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.v===st.mode));
-  $('dBox').style.display=y?'':'none';
-  document.querySelectorAll('#dm button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.m));
-  if(!(c.g in (y?KGG[c.m]:KG))) c.g=1;
+  $('dBox').style.display=(y||hv)?'':'none';
+  if(y||hv){ const opts=y?[['D1','Boru içinde'],['D2','Doğrudan toprağa']]:[['E1','Serbest havada / askıda'],['E2','Kablo tavasında']];
+    $('dm').innerHTML=opts.map(([v,t])=>`<button data-v="${v}" class="${v===c.m?'on':''}">${t}</button>`).join(''); }
+  if(!(c.g in GS)) c.g=1;
 }
 function toUI(){
   const c=cur(); fillSelects();
@@ -432,11 +443,11 @@ function run(){
   if(!(allow>0)){ $('err').textContent=`Önceki hatlardaki düşüm (%${fs(st.pv)}) sınırı (%${fs(tot)}) dolduruyor. Bu hat için pay kalmadı.`; $('out').innerHTML=''; last=null; return; }
   $('err').textContent='';
   const minS=st.dt==='ap'?2.5:0;
-  const base={P:amp?0:v*1000,I:amp?v:0,L,m:k.m,t:k.t,g:k.g,r:k.r,e:allow,minS,c:st.c,u1:st.u1,u3:st.u3,under:st.mode==='yer'};
+  const base={P:amp?0:v*1000,I:amp?v:0,L,m:k.m,t:k.t,g:k.g,r:k.r,e:allow,minS,c:st.c,u1:st.u1,u3:st.u3,under:st.mode!=='bina',mode:st.mode};
   const a=card('1c','Tek faz · Bakır',false,false,base), b=card('3c','Üç faz · Bakır',true,false,base),
         c=card('1a','Tek faz · Alüminyum',false,true,base), d=card('3a','Üç faz · Alüminyum',true,true,base);
   const lim=`<div class="note" style="margin:0 0 12px;background:var(--accent-soft);color:var(--accent)">${st.ts==='elle'?'Elle girilen sınır':(st.dt==='ap'?'Aydınlatma / priz':'Motor')+' devresi · '+(st.ts==='seb'?'yapı bağlantı kutusundan':'trafo çıkışından')+' toplam %'+fs(tot)}${st.ts!=='elle'&&st.pv>0?' − önceki %'+fs(st.pv):''} → bu hat için izin verilen düşüm <b>%${fmt(allow,2)}</b>${minS?' · en küçük kesit 2,5 mm² (linye)':''}</div>`;
-  const yn=base.under?`<div class="note" style="margin:0 0 12px">Yeraltında NYM kullanılmaz; bakırda NYY, alüminyumda NAYY verilir. Kum yatağı ve koruma tuğlası/bant unutulmasın.</div>`:'';
+  const yn=st.mode==='yer'?`<div class="note" style="margin:0 0 12px">Yeraltında NYM kullanılmaz; bakırda NYY, alüminyumda NAYY verilir. Kum yatağı ve koruma tuğlası/bant unutulmasın.</div>`:st.mode==='hav'?`<div class="note" style="margin:0 0 12px">Açıkta NYM kullanılmaz; UV dayanımlı NYY / NAYY verilir. Askı telli havai kablo (ABC) bu hesaba dahil değil, katalog değerleri gerekir. Hava hattı ise yükseklik ve açıklıklar Kuvvetli Akım Tesisleri Yönetmeliği md. 44'e göre kontrol edilmeli.</div>`:'';
   $('out').innerHTML=`${lim}${yn}<div class="grp">BAKIR</div>${a.h}${b.h}<div class="grp">ALÜMİNYUM</div>${c.h}${d.h}`;
   last={base,tot,under:base.under,allow,dev:st.dt==='ap'?'aydınlatma/priz':'motor',list:[['Tek faz bakır',a,false,false],['Üç faz bakır',b,true,false],['Tek faz alüminyum',c,false,true],['Üç faz alüminyum',d,true,true]]};
 }
@@ -444,15 +455,15 @@ function run(){
 
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function reportHtml(){
-  const k=cur(), b=last.base, y=last.under, now=new Date();
+  const k=cur(), b=last.base, y=st.mode==='yer', now=new Date();
   const dstr=now.toLocaleDateString('tr-TR')+' '+now.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
-  const mon=((y?MYER:MBINA).find(x=>x[0]===k.m)||['',k.m])[1];
+  const mon=((y?MYER:st.mode==='hav'?MHAV:MBINA).find(x=>x[0]===k.m)||['',k.m])[1];
   const amp=st.unit==='A';
   const inp=[
     [amp?'Yük akımı':'Yük gücü', fs(st.p)+(amp?' A':' kW')],
     ['Kablo metrajı', fs(st.l)+' m'],
     ['Devre tipi', st.dt==='ap'?'Aydınlatma / priz':'Motor'],
-    ['Döşeme', (y?'Yeraltı':'Bina içi')],
+    ['Döşeme', (y?'Yeraltı':st.mode==='hav'?'Havai / açıkta':'Bina içi')],
     ['Montaj yöntemi', mon],
     [y?'Toprak sıcaklığı':'Ortam sıcaklığı', k.t+' °C'],
     ['Gruplanan devre', String(k.g)],
@@ -497,6 +508,7 @@ function reportHtml(){
   <h2>Sonuçlar</h2>
   <div class="gr">${cardsH}</div>
   ${y?'<div class="nt">Yeraltında NYM kullanılmaz; bakırda NYY, alüminyumda NAYY verilmiştir. Kum yatağı ve koruma tuğlası/bandı uygulanmalıdır.</div>':''}
+  ${st.mode==='hav'?'<div class="nt">Açıkta NYM kullanılmaz; UV dayanımlı NYY / NAYY verilmiştir. Askı telli havai kablo bu hesaba dahil değildir. Hava hattında yükseklik ve açıklıklar Kuvvetli Akım Tesisleri Yönetmeliği md. 44\'e göre kontrol edilmelidir.</div>':''}
   ${!y&&st.dt==='ap'?'<div class="nt">Aydınlatma ve priz linyelerinde en küçük kesit 2,5 mm² alınmıştır.</div>':''}
   <div class="ft">Gerilim düşümü Elektrik İç Tesisleri Yönetmeliği formülüyle hesaplanmıştır: tek faz %e = 200·P·L/(k·S·U²), üç faz %e = 100·P·L/(k·S·U²); k bakır 56, alüminyum 35, reaktans ihmal (X=0). Sınır md. 57: yapı bağlantı kutusundan tüketiciye aydınlatma-priz %1,5, motor %3 (özel trafolu tesiste trafo çıkışından %6,5 / %8).
   Akım taşıma kapasitesi IEC 60364-5-52 PVC yalıtımlı (70 °C) tablolardan alınmış, sıcaklık${y?', toprak ısıl direnci':''} ve gruplama katsayılarıyla düzeltilmiştir. Sigorta seçimi Ib ≤ In ≤ Iz koşuluna göredir. Kısa devre ve döngü empedansı kontrolü bu rapora dahil değildir. Sonuçlar ön boyutlandırma niteliğindedir; uygulama projesinde mühendis kontrolü gerekir.</div>
@@ -508,7 +520,7 @@ window.pdfDone=function(ok){ $('share').textContent=ok?'PDF olarak paylaş':'PDF
 function shareText(){
   if(!last) return '';
   const k=cur();
-  let t=`Kablo kesit hesabı (${last.under?'yeraltı':'bina içi'})\n${st.unit==='A'?'Akım':'Güç'}: ${fs(st.p)} ${st.unit==='A'?'A':'kW'} · Metraj: ${fs(st.l)} m\nMontaj ${k.m}, ${k.t}°C, ${k.g} devre${last.under?', '+fs(k.r)+' K·m/W':''}, ${last.dev}, izin verilen %${fmt(last.allow,2)}\n\n`;
+  let t=`Kablo kesit hesabı (${st.mode==='yer'?'yeraltı':st.mode==='hav'?'havai':'bina içi'})\n${st.unit==='A'?'Akım':'Güç'}: ${fs(st.p)} ${st.unit==='A'?'A':'kW'} · Metraj: ${fs(st.l)} m\nMontaj ${k.m}, ${k.t}°C, ${k.g} devre${st.mode==='yer'?', '+fs(k.r)+' K·m/W':''}, ${last.dev}, izin verilen %${fmt(last.allow,2)}\n\n`;
   last.list.forEach(([n,x,tri,al])=>{
     t+= x.best ? `${n}: ${cableName(x.best.S,tri,al,last.under)} mm² · ${fmt(x.r.Ib,1)} A · %e ${fmt(x.best.e,2)} · sigorta ${x.best.In} A\n` : `${n}: uygun kesit yok\n`;
   });
@@ -524,7 +536,7 @@ $('ts').addEventListener('change',()=>{ readAdv(); toUI(); run(); });
 document.querySelectorAll('#dt button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.dt=b.dataset.v; toUI(); run(); }));
 $('m').addEventListener('change',()=>{ readAdv(); toUI(); run(); });
 document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.mode=b.dataset.v; toUI(); run(); }));
-document.querySelectorAll('#dm button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.yer.m=b.dataset.v; toUI(); run(); }));
+$('dm').addEventListener('click',ev=>{ const b=ev.target.closest('button'); if(!b) return; readAdv(); cur().m=b.dataset.v; toUI(); run(); });
 $('reset').addEventListener('click',()=>{ const keep={p:st.p,l:st.l,unit:st.unit,mode:st.mode,dt:st.dt}; Object.assign(st,clone(DEF),keep); toUI(); run(); });
 $('share').addEventListener('click',()=>{
   if(!last) return;
