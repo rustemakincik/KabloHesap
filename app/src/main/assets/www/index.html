@@ -75,6 +75,12 @@ body.locked #gate{display:block}
 .gcode{font-size:34px;font-weight:700;letter-spacing:4px;text-align:center;margin:6px 0 10px;font-family:ui-monospace,monospace}
 .gin{width:100%;font-size:26px;font-weight:700;letter-spacing:6px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);outline:none}
 .gin:focus{border-color:var(--accent)}
+.chips6{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.chips6 button{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;padding:9px 10px;text-align:left;display:flex;flex-direction:column;gap:2px;min-height:58px}
+.chips6 button b{font-size:13.5px;font-weight:600;line-height:1.25}
+.chips6 button small{font-size:11.5px;color:var(--muted)}
+.chips6 button.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.chips6 button.on b{color:var(--accent)}
 .foot{font-size:12px;color:var(--muted);margin:14px 4px;line-height:1.5}
 </style>
 </head>
@@ -110,14 +116,17 @@ body.locked #gate{display:block}
       <button data-v="ap">Aydınlatma / Priz</button>
       <button data-v="mo">Motor</button>
     </div>
-    <div class="seg" id="mode">
-      <button data-v="bina">Bina içi</button>
-      <button data-v="yer">Yeraltı</button>
-      <button data-v="hav">Havai / Açıkta</button>
+    <p style="font-size:13px;color:var(--muted);margin:14px 2px 6px">Kablo nasıl döşenecek?</p>
+    <div class="chips6" id="mode">
+      <button data-v="C"><b>Yüzeye kelepçeli</b><small>C</small></button>
+      <button data-v="E1"><b>Serbest havada / açıkta</b><small>E</small></button>
+      <button data-v="E2"><b>Delikli kablo tavasında</b><small>E · tava</small></button>
+      <button data-v="B2"><b>Duvar üzerinde boru içinde</b><small>B2</small></button>
+      <button data-v="A2"><b>Isı yalıtımlı duvar içinde</b><small>A2</small></button>
+      <button data-v="D"><b>Toprağa gömülü</b><small>D</small></button>
     </div>
     <div id="dBox">
-      <p style="font-size:13px;color:var(--muted);margin:12px 2px 0">Kablo nasıl döşenecek?</p>
-      <div class="seg" id="dm" style="margin-top:6px">
+      <div class="seg" id="dm" style="margin-top:8px">
         <button data-v="D1">Boru içinde</button>
         <button data-v="D2">Doğrudan toprağa</button>
       </div>
@@ -378,9 +387,10 @@ function fillSelects(){
   $('r').innerHTML=sortK(KR.D1).map(r=>`<option value="${r}">${fs(r)} K·m/W${r==='1'?' (nemli)':r==='2.5'?' (kuru, güvenli)':''}</option>`).join('');
   $('tLbl').textContent=y?'Toprak sıcaklığı':'Ortam sıcaklığı';
   $('rBox').style.display=y?'':'none';
-  document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.v===st.mode));
-  $('dBox').style.display=(y||hv)?'':'none';
-  if(y||hv){ const opts=y?[['D1','Boru içinde'],['D2','Doğrudan toprağa']]:[['E1','Serbest havada / askıda'],['E2','Kablo tavasında']];
+  const chip=y?'D':hv?c.m:(c.m[0]==='A'?'A2':c.m[0]==='B'?'B2':'C');
+  document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.v===chip));
+  $('dBox').style.display=y?'':'none';
+  if(y){ const opts=y?[['D1','Boru içinde'],['D2','Doğrudan toprağa']]:[['E1','Serbest havada / askıda'],['E2','Kablo tavasında']];
     $('dm').innerHTML=opts.map(([v,t])=>`<button data-v="${v}" class="${v===c.m?'on':''}">${t}</button>`).join(''); }
   if(!(c.g in GS)) c.g=1;
 }
@@ -463,7 +473,7 @@ function reportHtml(){
     [amp?'Yük akımı':'Yük gücü', fs(st.p)+(amp?' A':' kW')],
     ['Kablo metrajı', fs(st.l)+' m'],
     ['Devre tipi', st.dt==='ap'?'Aydınlatma / priz':'Motor'],
-    ['Döşeme', (y?'Yeraltı':st.mode==='hav'?'Havai / açıkta':'Bina içi')],
+    ['Döşeme', ((document.querySelector('#mode button.on b')||{}).textContent||'')+(y?(k.m==='D1'?' · boru içinde':' · doğrudan toprağa'):'')],
     ['Montaj yöntemi', mon],
     [y?'Toprak sıcaklığı':'Ortam sıcaklığı', k.t+' °C'],
     ['Gruplanan devre', String(k.g)],
@@ -535,7 +545,9 @@ document.addEventListener('click',ev=>{
 $('ts').addEventListener('change',()=>{ readAdv(); toUI(); run(); });
 document.querySelectorAll('#dt button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.dt=b.dataset.v; toUI(); run(); }));
 $('m').addEventListener('change',()=>{ readAdv(); toUI(); run(); });
-document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); st.mode=b.dataset.v; toUI(); run(); }));
+document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',()=>{ readAdv(); const v=b.dataset.v;
+  if(v==='D') st.mode='yer'; else if(v[0]==='E'){ st.mode='hav'; st.hav.m=v; } else { st.mode='bina'; st.bina.m=v; }
+  toUI(); run(); }));
 $('dm').addEventListener('click',ev=>{ const b=ev.target.closest('button'); if(!b) return; readAdv(); cur().m=b.dataset.v; toUI(); run(); });
 $('reset').addEventListener('click',()=>{ const keep={p:st.p,l:st.l,unit:st.unit,mode:st.mode,dt:st.dt}; Object.assign(st,clone(DEF),keep); toUI(); run(); });
 $('share').addEventListener('click',()=>{
